@@ -21,7 +21,9 @@ def create_app() -> FastAPI:
     async def health():
         return {"status": "ok"}
 
-    # Mount SPA static files (built frontend) — only in production
+    # NOTE: All API routers must be included ABOVE this line.
+    # The SPA static file mount catches ALL unmatched routes.
+    # Any router registered after this mount will be unreachable.
     spa_path = Path("/app/frontend/dist")
     if spa_path.exists():
         app.mount("/", StaticFiles(directory=str(spa_path), html=True), name="spa")
