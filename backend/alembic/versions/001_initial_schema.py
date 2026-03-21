@@ -102,7 +102,7 @@ def upgrade() -> None:
         sa.Column("email_id", sa.Integer(), nullable=False),
         sa.Column("vendor_odoo_id", sa.Integer(), nullable=True),
         sa.Column("vendor_name", sa.String(500), nullable=False),
-        sa.Column("vendor_confidence", sa.String(10), nullable=False),
+        sa.Column("vendor_confidence", sa.Enum("low", "medium", "high", name="confidencelevel"), nullable=False),
         sa.Column("line_items", sa.Text(), nullable=False),
         sa.Column("total_amount", sa.String(50), nullable=True),
         sa.Column("expected_date", sa.String(50), nullable=True),
@@ -128,7 +128,7 @@ def upgrade() -> None:
         sa.Column("odoo_po_id", sa.Integer(), nullable=False),
         sa.Column("odoo_po_name", sa.String(100), nullable=False),
         sa.Column("vendor_name", sa.String(500), nullable=False),
-        sa.Column("status", sa.String(50), nullable=False),
+        sa.Column("status", sa.Enum("draft", "confirmed", "received", "cancelled", name="postatus"), nullable=False),
         sa.Column("sales_order_id", sa.Integer(), nullable=True),
         sa.Column("sales_order_name", sa.String(100), nullable=True),
         sa.Column("tracking_info", sa.Text(), nullable=True),
@@ -218,3 +218,5 @@ def downgrade() -> None:
     op.execute("DROP TYPE IF EXISTS rulefield")
     op.execute("DROP TYPE IF EXISTS matchtype")
     op.execute("DROP TYPE IF EXISTS draftstatus")
+    op.execute("DROP TYPE IF EXISTS confidencelevel")
+    op.execute("DROP TYPE IF EXISTS postatus")

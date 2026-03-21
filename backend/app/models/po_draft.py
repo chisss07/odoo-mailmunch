@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 import enum
+import sqlalchemy as sa
 from sqlalchemy import String, DateTime, Text, Enum as SAEnum, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
@@ -11,6 +12,12 @@ class DraftStatus(str, enum.Enum):
     SUBMITTED = "submitted"
 
 
+class ConfidenceLevel(str, enum.Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+
 class PODraft(Base):
     __tablename__ = "po_drafts"
 
@@ -18,7 +25,9 @@ class PODraft(Base):
     email_id: Mapped[int] = mapped_column(index=True)
     vendor_odoo_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     vendor_name: Mapped[str] = mapped_column(String(500))
-    vendor_confidence: Mapped[str] = mapped_column(String(10), default="low")
+    vendor_confidence: Mapped[ConfidenceLevel] = mapped_column(
+        sa.Enum(ConfidenceLevel, name="confidencelevel"), default=ConfidenceLevel.low
+    )
     line_items: Mapped[str] = mapped_column(Text)
     total_amount: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     expected_date: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
