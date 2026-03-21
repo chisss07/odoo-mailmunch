@@ -1,0 +1,8 @@
+{
+  "name": "odoo-mailmunch-frontend",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "mkdir -p dist && echo '<html><body>Loading...</body></html>' > dist/index.html",
+    "dev": "echo 'dev not configured yet'"
+  }
+}

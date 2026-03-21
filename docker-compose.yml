@@ -1,0 +1,49 @@
+services:
+  mailmunch:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - attachments:/app/attachments
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: arq app.workers.worker.WorkerSettings
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - attachments:/app/attachments
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mailmunch
+      POSTGRES_PASSWORD: mailmunch
+      POSTGRES_DB: mailmunch
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailmunch"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  attachments:
