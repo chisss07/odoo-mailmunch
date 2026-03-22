@@ -5,6 +5,12 @@ from pathlib import Path
 
 from app.config import settings
 from app.routers import auth as auth_router
+from app.routers import emails as emails_router
+from app.routers import triage as triage_router
+from app.routers import po_drafts as po_drafts_router
+from app.routers import po_tracking as po_tracking_router
+from app.routers import odoo_proxy as odoo_proxy_router
+from app.routers import settings as settings_router
 
 
 def create_app() -> FastAPI:
@@ -23,6 +29,12 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(auth_router.router)
+    app.include_router(emails_router.router)
+    app.include_router(triage_router.router)
+    app.include_router(po_drafts_router.router)
+    app.include_router(po_tracking_router.router)
+    app.include_router(odoo_proxy_router.router)
+    app.include_router(settings_router.router)
 
     # NOTE: All API routers must be included ABOVE this line.
     # The SPA static file mount catches ALL unmatched routes.

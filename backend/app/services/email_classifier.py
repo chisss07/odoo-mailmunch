@@ -74,7 +74,7 @@ def classify_email(
 
     # Check PO
     po_score = _keyword_score(combined, PO_KEYWORDS)
-    if po_score >= 1 or (is_known_vendor and po_score >= 1):
+    if po_score >= 1:
         return "purchase_order"
 
     # Check bill
