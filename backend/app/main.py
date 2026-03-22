@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from app.config import settings
+from app.routers import auth as auth_router
 
 
 def create_app() -> FastAPI:
@@ -20,6 +21,8 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     async def health():
         return {"status": "ok"}
+
+    app.include_router(auth_router.router)
 
     # NOTE: All API routers must be included ABOVE this line.
     # The SPA static file mount catches ALL unmatched routes.
