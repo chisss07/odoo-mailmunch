@@ -117,7 +117,7 @@ async def inbound_email_webhook(
         source=EmailSource.FORWARD,
         status=EmailStatus.PROCESSING,
         classification=EmailClassification.UNCLASSIFIED,
-        user_id=0,
+        user_id=0,  # TODO(Task 12): ARQ worker must reassign to correct user before processing
     )
     db.add(email_record)
     await db.commit()

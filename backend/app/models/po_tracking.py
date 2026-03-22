@@ -9,7 +9,9 @@ from app.database import Base
 
 class POStatus(str, enum.Enum):
     draft = "draft"
-    confirmed = "confirmed"
+    ordered = "ordered"
+    shipped = "shipped"
+    partial = "partial"
     received = "received"
     cancelled = "cancelled"
 

@@ -9,7 +9,7 @@ from app.database import get_db
 from app.deps import get_current_user, get_odoo_client
 from app.models.session import UserSession
 from app.models.po_draft import PODraft, DraftStatus
-from app.models.po_tracking import POTracking
+from app.models.po_tracking import POTracking, POStatus
 from app.services.odoo_client import OdooClient
 from app.services.po_builder import create_po_in_odoo
 
@@ -131,7 +131,7 @@ async def submit_draft(
         odoo_po_id=po_result["id"],
         odoo_po_name=po_result["name"],
         vendor_name=draft.vendor_name,
-        status="ordered",
+        status=POStatus.ordered,
         sales_order_id=draft.sales_order_id,
         sales_order_name=draft.sales_order_name,
         draft_id=draft.id,

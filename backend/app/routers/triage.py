@@ -72,7 +72,14 @@ async def triage_action(
                 value=domain,
                 user_id=user.odoo_uid,
             )
-            db.add(rule)
+        else:
+            rule = IgnoreRule(
+                field=RuleField.SENDER,
+                match_type=MatchType.EXACT,
+                value=email_record.sender,
+                user_id=user.odoo_uid,
+            )
+        db.add(rule)
     else:
         raise HTTPException(status_code=400, detail=f"Unknown action: {action.action}")
 

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import get_current_user, get_odoo_client
 from app.models.session import UserSession
-from app.models.po_tracking import POTracking
+from app.models.po_tracking import POTracking, POStatus
 from app.services.odoo_client import OdooClient
 from app.services.po_builder import create_receipt_in_odoo
 
@@ -67,7 +67,7 @@ async def get_po(
         "sales_order_id": po.sales_order_id,
         "sales_order_name": po.sales_order_name,
         "tracking_info": json.loads(po.tracking_info) if po.tracking_info else None,
-        "last_synced": po.last_synced.isoformat(),
+        "last_synced": po.last_synced.isoformat() if po.last_synced else None,
     }
 
 
@@ -89,6 +89,6 @@ async def receive_po(
         receipt = await create_receipt_in_odoo(odoo, po.odoo_po_id, req.lines)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Odoo error: {str(e)}")
-    po.status = "received" if req.lines is None else "partial"
+    po.status = POStatus.received if req.lines is None else POStatus.partial
     await db.commit()
     return {"status": po.status, "picking_name": receipt["picking_name"]}
