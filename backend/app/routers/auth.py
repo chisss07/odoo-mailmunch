@@ -1,16 +1,18 @@
+import json
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.config import settings
 from app.database import get_db
+from app.deps import get_current_user
 from app.models.session import UserSession
 from app.services.encryption import encrypt, decrypt
 from app.services.jwt_service import create_access_token, create_refresh_token, verify_token
 from app.services.odoo_auth import authenticate_odoo, verify_totp
-from sqlalchemy import select
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -39,7 +41,13 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
     if result["needs_totp"]:
-        totp_session = encrypt(f"{result['uid']}|{result['session_id']}|{req.odoo_url}|{req.database}")
+        totp_data = json.dumps({
+            "uid": result["uid"],
+            "session_id": result["session_id"],
+            "odoo_url": req.odoo_url,
+            "database": req.database,
+        })
+        totp_session = encrypt(totp_data)
         return {"needs_totp": True, "totp_session": totp_session}
 
     return await _create_session(db, result["uid"], result["session_id"], req.odoo_url, req.database)
@@ -48,8 +56,13 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
 @router.post("/totp")
 async def complete_totp(req: TOTPRequest, db: AsyncSession = Depends(get_db)):
     try:
-        parts = decrypt(req.totp_session).split("|")
-        uid, session_id, odoo_url, odoo_db = int(parts[0]), parts[1], parts[2], parts[3]
+        plain = decrypt(req.totp_session)
+        totp_data = json.loads(plain)
+        uid_str = str(totp_data["uid"])
+        session_id = totp_data["session_id"]
+        odoo_url = totp_data["odoo_url"]
+        odoo_db = totp_data["database"]
+        uid = int(uid_str)
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid TOTP session")
 
@@ -89,7 +102,12 @@ async def refresh(req: RefreshRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/logout")
-async def logout():
+async def logout(
+    current_user: UserSession = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await db.delete(current_user)
+    await db.commit()
     return {"status": "ok"}
 
 
