@@ -50,6 +50,8 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Odoo error: {e}")
 
     uid = result["uid"]
     access_token = create_access_token(user_id=uid, odoo_uid=uid, odoo_url=req.odoo_url)

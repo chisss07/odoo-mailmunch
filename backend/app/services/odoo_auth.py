@@ -46,6 +46,8 @@ async def authenticate_odoo(url: str, db: str, login: str, credential: str, *, i
         raise ValueError("Cannot connect to Odoo. Check your URL.")
     except httpx.TimeoutException:
         raise ValueError("Connection to Odoo timed out.")
+    except Exception as e:
+        raise ValueError(f"Failed to connect to Odoo: {e}")
 
     try:
         result = xmlrpc.client.loads(response.text)
