@@ -12,20 +12,25 @@ export default function FileUpload({ onUploaded }: FileUploadProps) {
   const [pasteText, setPasteText] = useState('')
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState('')
+  const [isError, setIsError] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const handleFiles = async (files: FileList) => {
     setUploading(true)
     setMessage('')
+    setIsError(false)
     try {
+      const names: string[] = []
       for (const file of Array.from(files)) {
         const form = new FormData()
         form.append('file', file)
         await api.post('/emails/upload', form)
+        names.push(file.name)
       }
-      setMessage(`${files.length} file(s) uploaded`)
+      setMessage(`Uploaded: ${names.join(', ')}`)
       onUploaded?.()
     } catch (err) {
+      setIsError(true)
       const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null
       setMessage(detail || `Upload failed (${axios.isAxiosError(err) ? `HTTP ${err.response?.status}` : 'unknown error'})`)
     } finally {
@@ -118,7 +123,9 @@ export default function FileUpload({ onUploaded }: FileUploadProps) {
           />
         </div>
       )}
-      {message && <p className="text-white/60 text-xs mt-2">{message}</p>}
+      {message && (
+        <p className={`text-xs mt-2 ${isError ? 'text-red-400' : 'text-green-400'}`}>{message}</p>
+      )}
     </div>
   )
 }

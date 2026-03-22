@@ -1,9 +1,10 @@
 import email
 from email import policy
 from html.parser import HTMLParser
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 
+import extract_msg
 import pdfplumber
 import openpyxl
 
@@ -82,6 +83,40 @@ def extract_text_from_eml(raw_bytes: bytes) -> dict:
         "html_body": html_body,
         "attachments": attachments,
     }
+
+
+def extract_text_from_msg(raw_bytes: bytes) -> dict:
+    """Parse Outlook .msg files using extract-msg."""
+    msg = extract_msg.Message(BytesIO(raw_bytes))
+    try:
+        sender = msg.sender or ""
+        subject = msg.subject or ""
+        body = msg.body or ""
+        html_body = msg.htmlBody
+        if isinstance(html_body, bytes):
+            html_body = html_body.decode("utf-8", errors="replace")
+
+        if not body and html_body:
+            body = html_to_text(html_body)
+
+        attachments = []
+        for att in msg.attachments:
+            if hasattr(att, 'data') and att.data:
+                attachments.append({
+                    "filename": att.longFilename or att.shortFilename or "unnamed",
+                    "content_type": att.mimetype or "application/octet-stream",
+                    "data": att.data,
+                })
+
+        return {
+            "sender": sender,
+            "subject": subject,
+            "body": body,
+            "html_body": html_body,
+            "attachments": attachments,
+        }
+    finally:
+        msg.close()
 
 
 def extract_text_from_pdf(file_path: str | Path) -> str:

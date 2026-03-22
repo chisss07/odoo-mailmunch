@@ -10,7 +10,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models.session import UserSession
 from app.models.email import Email, EmailSource, EmailStatus, EmailClassification
-from app.services.text_extractor import extract_text_from_eml, extract_text_from_pdf, extract_text_from_xlsx, html_to_text
+from app.services.text_extractor import extract_text_from_eml, extract_text_from_msg, extract_text_from_pdf, extract_text_from_xlsx, html_to_text
 from app.config import settings
 
 router = APIRouter(prefix="/api/emails", tags=["emails"])
@@ -58,7 +58,9 @@ async def upload_email(
     content = await file.read()
     filename = file.filename or "unknown"
 
-    if filename.endswith((".eml", ".msg")):
+    if filename.endswith(".msg"):
+        parsed = extract_text_from_msg(content)
+    elif filename.endswith(".eml"):
         parsed = extract_text_from_eml(content)
         sender = parsed["sender"]
         subject = parsed["subject"]
