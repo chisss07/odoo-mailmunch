@@ -1,5 +1,6 @@
 services:
   mailmunch:
+    image: chisss/odoo-integrator:latest
     build: .
     ports:
       - "8000:8000"
@@ -14,6 +15,7 @@ services:
     restart: unless-stopped
 
   worker:
+    image: chisss/odoo-integrator:latest
     build: .
     command: arq app.workers.worker.WorkerSettings
     env_file: .env
