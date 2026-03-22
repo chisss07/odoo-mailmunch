@@ -18,8 +18,11 @@ def should_ignore(sender: str, subject: str, rules: list[dict]) -> bool:
             if rule["value"].lower() in field_value.lower():
                 return True
         elif rule["match_type"] == "regex":
-            if re.search(rule["value"], field_value, re.IGNORECASE):
-                return True
+            try:
+                if re.search(rule["value"], field_value, re.IGNORECASE):
+                    return True
+            except re.error:
+                pass  # Malformed regex — treat as non-match
 
     return False
 
@@ -59,7 +62,8 @@ def classify_email(
     sender_domain: str,
     known_vendor_domains: list[str],
 ) -> str:
-    combined = f"{subject} {body}"
+    MAX_CLASSIFY_CHARS = 50_000
+    combined = f"{subject} {body}"[:MAX_CLASSIFY_CHARS]
 
     is_known_vendor = sender_domain.lower() in [d.lower() for d in known_vendor_domains]
 
@@ -70,7 +74,7 @@ def classify_email(
 
     # Check PO
     po_score = _keyword_score(combined, PO_KEYWORDS)
-    if po_score >= 1 or (is_known_vendor and po_score >= 0.5):
+    if po_score >= 1 or (is_known_vendor and po_score >= 1):
         return "purchase_order"
 
     # Check bill

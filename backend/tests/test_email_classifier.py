@@ -47,3 +47,39 @@ def test_classify_unknown():
         known_vendor_domains=["acmewidgets.com"],
     )
     assert result == "unclassified"
+
+
+def test_should_ignore_regex():
+    rules = [{"field": "subject", "match_type": "regex", "value": r"inv(?:oice)?\s*#\d+"}]
+    assert should_ignore(sender="x@y.com", subject="Invoice #123", rules=rules) is True
+    assert should_ignore(sender="x@y.com", subject="Order Confirmed", rules=rules) is False
+
+
+def test_should_ignore_bad_regex_does_not_crash():
+    rules = [{"field": "subject", "match_type": "regex", "value": "[invalid("}]
+    # Malformed regex should be treated as non-match, not crash
+    assert should_ignore(sender="x@y.com", subject="Invoice #123", rules=rules) is False
+
+
+def test_should_ignore_empty_rules():
+    assert should_ignore(sender="x@y.com", subject="Invoice", rules=[]) is False
+
+
+def test_classify_bill():
+    result = classify_email(
+        subject="Payment Due",
+        body="Amount due: $450.00. Please remit payment by March 31.",
+        sender_domain="utilities.com",
+        known_vendor_domains=[],
+    )
+    assert result == "bill"
+
+
+def test_classify_shipping_priority_over_po():
+    result = classify_email(
+        subject="Order Confirmation - Your package has shipped",
+        body="Order confirmed. Tracking number: 1Z999AA10123456784",
+        sender_domain="acme.com",
+        known_vendor_domains=["acme.com"],
+    )
+    assert result == "shipping_notice"
