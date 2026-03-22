@@ -60,6 +60,11 @@ async def upload_email(
 
     if filename.endswith(".msg"):
         parsed = extract_text_from_msg(content)
+        sender = parsed["sender"]
+        subject = parsed["subject"]
+        body = parsed["body"]
+        html_body = parsed.get("html_body")
+        attachments = parsed.get("attachments", [])
     elif filename.endswith(".eml"):
         parsed = extract_text_from_eml(content)
         sender = parsed["sender"]
