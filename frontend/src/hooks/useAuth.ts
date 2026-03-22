@@ -22,9 +22,12 @@ export function useAuth() {
       setIsAuthenticated(true)
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.detail || 'Login failed')
+        const status = err.response?.status
+        const detail = err.response?.data?.detail
+        const body = typeof err.response?.data === 'string' ? err.response.data : null
+        setError(detail || body || `Login failed (HTTP ${status || 'unknown'})`)
       } else {
-        setError('An unexpected error occurred')
+        setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
       }
     }
   }, [])
