@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import axios from 'axios'
 import api from '../api/client'
 
 interface FileUploadProps {
@@ -24,8 +25,9 @@ export default function FileUpload({ onUploaded }: FileUploadProps) {
       }
       setMessage(`${files.length} file(s) uploaded`)
       onUploaded?.()
-    } catch {
-      setMessage('Upload failed')
+    } catch (err) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null
+      setMessage(detail || `Upload failed (${axios.isAxiosError(err) ? `HTTP ${err.response?.status}` : 'unknown error'})`)
     } finally {
       setUploading(false)
     }
@@ -40,8 +42,9 @@ export default function FileUpload({ onUploaded }: FileUploadProps) {
       setPasteMode(false)
       setMessage('Email submitted')
       onUploaded?.()
-    } catch {
-      setMessage('Submit failed')
+    } catch (err) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null
+      setMessage(detail || 'Submit failed')
     } finally {
       setUploading(false)
     }

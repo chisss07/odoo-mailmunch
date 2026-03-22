@@ -10,7 +10,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models.session import UserSession
 from app.models.email import Email, EmailSource, EmailStatus, EmailClassification
-from app.services.text_extractor import extract_text_from_eml, html_to_text
+from app.services.text_extractor import extract_text_from_eml, extract_text_from_pdf, extract_text_from_xlsx, html_to_text
 from app.config import settings
 
 router = APIRouter(prefix="/api/emails", tags=["emails"])
@@ -65,6 +65,26 @@ async def upload_email(
         body = parsed["body"]
         html_body = parsed.get("html_body")
         attachments = parsed.get("attachments", [])
+    elif filename.endswith(".pdf") or filename.endswith(".xlsx"):
+        # Save to temp file for extraction, then clean up
+        import tempfile
+        suffix = Path(filename).suffix
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        try:
+            if filename.endswith(".pdf"):
+                body = extract_text_from_pdf(tmp_path)
+            else:
+                body = extract_text_from_xlsx(tmp_path)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to extract text from {filename}: {e}")
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+        sender = "file-upload"
+        subject = filename
+        html_body = None
+        attachments = []
     else:
         sender = "file-upload"
         subject = filename
