@@ -1,8 +1,376 @@
+import { useEffect, useState, useCallback } from 'react'
+import axios from 'axios'
+import api from '../api/client'
+import IgnoreRuleList from '../components/IgnoreRuleList'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Setting {
+  key: string
+  value: string
+  is_secret: boolean
+}
+
+interface OdooSession {
+  odoo_url: string
+  database: string
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const INPUT_CLASS =
+  'w-full bg-surface border border-white/20 rounded px-3 py-2 text-white text-sm focus:border-primary focus:outline-none'
+
+const M365_KEYS = [
+  { key: 'm365_tenant_id', label: 'Tenant ID', secret: false },
+  { key: 'm365_client_id', label: 'Client ID', secret: false },
+  { key: 'm365_client_secret', label: 'Client Secret', secret: true },
+  { key: 'm365_mailbox_folder', label: 'Mailbox Folder', secret: false },
+] as const
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-surface-light rounded-lg p-6 mb-4">
+      <h2 className="text-white font-semibold text-base mb-4">{title}</h2>
+      {children}
+    </div>
+  )
+}
+
+function StatusBadge({ ok, okLabel = 'Connected', failLabel = 'Not configured' }: {
+  ok: boolean
+  okLabel?: string
+  failLabel?: string
+}) {
+  return ok ? (
+    <span className="inline-flex items-center gap-1.5 text-xs text-green-400">
+      <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+      {okLabel}
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5 text-xs text-white/40">
+      <span className="w-1.5 h-1.5 rounded-full bg-white/20 inline-block" />
+      {failLabel}
+    </span>
+  )
+}
+
+// ─── M365 Section ─────────────────────────────────────────────────────────────
+
+function M365Section({ settings }: { settings: Setting[] }) {
+  const getVal = (key: string) => {
+    const s = settings.find(s => s.key === key)
+    return s?.value ?? ''
+  }
+
+  const [fields, setFields] = useState<Record<string, string>>({
+    m365_tenant_id: '',
+    m365_client_id: '',
+    m365_client_secret: '',
+    m365_mailbox_folder: '',
+  })
+
+  const [saving, setSaving] = useState<string | null>(null)
+  const [savedKey, setSavedKey] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Sync incoming settings into local field state (skip masked secrets)
+  useEffect(() => {
+    setFields({
+      m365_tenant_id: getVal('m365_tenant_id'),
+      m365_client_id: getVal('m365_client_id'),
+      // Leave secret blank so user must re-enter; show placeholder if masked
+      m365_client_secret: '',
+      m365_mailbox_folder: getVal('m365_mailbox_folder'),
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings])
+
+  const isConfigured = !!getVal('m365_tenant_id') && !!getVal('m365_client_id')
+
+  const handleSave = async (key: string, value: string) => {
+    setSaving(key)
+    setErrors(e => ({ ...e, [key]: '' }))
+    try {
+      await api.put('/settings', { key, value })
+      setSavedKey(key)
+      setTimeout(() => setSavedKey(k => (k === key ? null : k)), 2000)
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setErrors(e => ({ ...e, [key]: err.response?.data?.detail || 'Save failed' }))
+      } else {
+        setErrors(e => ({ ...e, [key]: 'An unexpected error occurred' }))
+      }
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  return (
+    <SectionCard title="M365 Connection">
+      <div className="flex items-center justify-between mb-4">
+        <StatusBadge ok={isConfigured} />
+      </div>
+
+      <div className="space-y-4">
+        {M365_KEYS.map(({ key, label, secret }) => (
+          <div key={key}>
+            <label className="block text-white/60 text-xs mb-1">{label}</label>
+            <div className="flex gap-2">
+              <input
+                type={secret ? 'password' : 'text'}
+                value={fields[key]}
+                placeholder={
+                  secret && getVal(key) === '****' ? 'Already set — enter new value to change' : ''
+                }
+                onChange={e => setFields(f => ({ ...f, [key]: e.target.value }))}
+                className={INPUT_CLASS}
+              />
+              <button
+                onClick={() => handleSave(key, fields[key])}
+                disabled={saving === key}
+                className="bg-primary hover:bg-primary/80 text-white text-sm px-4 py-2 rounded disabled:opacity-40 shrink-0"
+              >
+                {saving === key ? 'Saving...' : savedKey === key ? 'Saved' : 'Save'}
+              </button>
+            </div>
+            {errors[key] && (
+              <p className="text-red-400 text-xs mt-1">{errors[key]}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  )
+}
+
+// ─── Odoo Section ─────────────────────────────────────────────────────────────
+
+function OdooSection() {
+  const [session, setSession] = useState<OdooSession | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { data } = await api.get<OdooSession>('/auth/session')
+        setSession(data)
+      } catch {
+        // session endpoint may not exist; fail silently
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  return (
+    <SectionCard title="Odoo Connection">
+      <div className="flex items-center justify-between mb-4">
+        <StatusBadge ok={!!session} okLabel="Connected" failLabel="Unknown" />
+      </div>
+
+      {loading ? (
+        <p className="text-white/40 text-sm">Loading...</p>
+      ) : session ? (
+        <div className="space-y-3">
+          <div>
+            <p className="text-white/50 text-xs mb-0.5">URL</p>
+            <p className="text-white text-sm">{session.odoo_url}</p>
+          </div>
+          <div>
+            <p className="text-white/50 text-xs mb-0.5">Database</p>
+            <p className="text-white text-sm">{session.database}</p>
+          </div>
+        </div>
+      ) : (
+        <p className="text-white/40 text-sm">
+          Connection details unavailable. You are authenticated via the login screen.
+        </p>
+      )}
+    </SectionCard>
+  )
+}
+
+// ─── Sync Settings Section ────────────────────────────────────────────────────
+
+interface SyncData {
+  auto_sync_enabled: boolean
+  last_product_cache_refresh: string | null
+  last_vendor_cache_refresh: string | null
+}
+
+function SyncSection({ settings, onSettingsChange }: {
+  settings: Setting[]
+  onSettingsChange: () => void
+}) {
+  const getVal = (key: string) => settings.find(s => s.key === key)?.value ?? ''
+
+  const autoSyncRaw = getVal('auto_sync_enabled')
+  const autoSync = autoSyncRaw === 'true' || autoSyncRaw === '1'
+  const lastProduct = getVal('last_product_cache_refresh')
+  const lastVendor = getVal('last_vendor_cache_refresh')
+
+  const [toggling, setToggling] = useState(false)
+  const [toggleError, setToggleError] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState('')
+  const [refreshDone, setRefreshDone] = useState(false)
+
+  const handleToggle = async () => {
+    setToggling(true)
+    setToggleError('')
+    try {
+      await api.put('/settings', { key: 'auto_sync_enabled', value: String(!autoSync) })
+      onSettingsChange()
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setToggleError(err.response?.data?.detail || 'Failed to update setting')
+      } else {
+        setToggleError('An unexpected error occurred')
+      }
+    } finally {
+      setToggling(false)
+    }
+  }
+
+  const handleRefreshCaches = async () => {
+    setRefreshing(true)
+    setRefreshError('')
+    setRefreshDone(false)
+    try {
+      await api.post('/sync/refresh-caches')
+      setRefreshDone(true)
+      onSettingsChange()
+      setTimeout(() => setRefreshDone(false), 3000)
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setRefreshError(err.response?.data?.detail || 'Refresh failed')
+      } else {
+        setRefreshError('An unexpected error occurred')
+      }
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const formatDate = (val: string) => {
+    if (!val) return 'Never'
+    try {
+      return new Date(val).toLocaleString()
+    } catch {
+      return val
+    }
+  }
+
+  return (
+    <SectionCard title="Sync Settings">
+      <div className="space-y-4">
+        {/* Auto-sync toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-white text-sm">Auto-sync</p>
+            <p className="text-white/40 text-xs mt-0.5">Automatically process incoming emails</p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={autoSync}
+            onClick={handleToggle}
+            disabled={toggling}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-40 ${
+              autoSync ? 'bg-primary' : 'bg-white/20'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                autoSync ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        {toggleError && (
+          <p className="text-red-400 text-xs">{toggleError}</p>
+        )}
+
+        {/* Cache timestamps */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/10">
+          <div>
+            <p className="text-white/50 text-xs mb-0.5">Last Product Cache Refresh</p>
+            <p className="text-white text-sm">{formatDate(lastProduct)}</p>
+          </div>
+          <div>
+            <p className="text-white/50 text-xs mb-0.5">Last Vendor Cache Refresh</p>
+            <p className="text-white text-sm">{formatDate(lastVendor)}</p>
+          </div>
+        </div>
+
+        {/* Refresh button */}
+        <div className="pt-2">
+          <button
+            onClick={handleRefreshCaches}
+            disabled={refreshing}
+            className="border border-white/20 text-white/70 hover:text-white text-sm px-4 py-2 rounded disabled:opacity-40"
+          >
+            {refreshing ? 'Refreshing...' : refreshDone ? 'Refreshed' : 'Refresh Caches Now'}
+          </button>
+          {refreshError && (
+            <p className="text-red-400 text-xs mt-2">{refreshError}</p>
+          )}
+        </div>
+      </div>
+    </SectionCard>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function SettingsPage() {
+  const [settings, setSettings] = useState<Setting[]>([])
+  const [loadError, setLoadError] = useState('')
+
+  const loadSettings = useCallback(async () => {
+    setLoadError('')
+    try {
+      const { data } = await api.get<Setting[]>('/settings')
+      setSettings(data)
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setLoadError(err.response?.data?.detail || 'Failed to load settings')
+      } else {
+        setLoadError('An unexpected error occurred')
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    loadSettings()
+  }, [loadSettings])
+
   return (
     <div>
       <h1 className="text-white text-2xl font-semibold mb-6">Settings</h1>
-      <p className="text-white/50">Settings coming in Task 16.</p>
+
+      {loadError && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 mb-4">
+          <p className="text-red-400 text-sm">{loadError}</p>
+        </div>
+      )}
+
+      <M365Section settings={settings} />
+
+      <OdooSection />
+
+      <SyncSection settings={settings} onSettingsChange={loadSettings} />
+
+      <SectionCard title="Ignore Rules">
+        <p className="text-white/50 text-xs mb-4">
+          Emails matching these rules will be automatically skipped during processing.
+        </p>
+        <IgnoreRuleList />
+      </SectionCard>
     </div>
   )
 }
