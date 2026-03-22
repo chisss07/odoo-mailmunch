@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 from arq import cron
 from arq.connections import RedisSettings
 
@@ -8,10 +10,14 @@ from app.workers.odoo_sync import sync_po_statuses, refresh_caches
 
 
 def parse_redis_url(url: str) -> RedisSettings:
-    """Parse redis://host:port into RedisSettings."""
-    url = url.replace("redis://", "")
-    host, port = url.split(":") if ":" in url else (url, "6379")
-    return RedisSettings(host=host, port=int(port))
+    """Parse redis:// URL into RedisSettings."""
+    parsed = urlparse(url)
+    return RedisSettings(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 6379,
+        password=parsed.password,
+        database=int(parsed.path.lstrip("/") or 0),
+    )
 
 
 class WorkerSettings:

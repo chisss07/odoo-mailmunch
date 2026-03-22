@@ -84,11 +84,12 @@ async def refresh_caches(ctx: dict):
                 )
                 now = datetime.now(timezone.utc)
 
+                # Bulk-load existing cache for O(1) lookups
+                existing_products_result = await db.execute(select(ProductCache))
+                product_cache_map = {pc.odoo_id: pc for pc in existing_products_result.scalars().all()}
+
                 for p in products:
-                    existing = await db.execute(
-                        select(ProductCache).where(ProductCache.odoo_id == p["id"])
-                    )
-                    cached = existing.scalar_one_or_none()
+                    cached = product_cache_map.get(p["id"])
                     if cached:
                         cached.name = p["name"]
                         cached.default_code = p.get("default_code") or None
@@ -108,12 +109,13 @@ async def refresh_caches(ctx: dict):
                     ["name", "email"],
                     limit=5000,
                 )
+
+                existing_vendors_result = await db.execute(select(VendorCache))
+                vendor_cache_map = {vc.odoo_id: vc for vc in existing_vendors_result.scalars().all()}
+
                 for v in vendors:
                     email_domain = v.get("email", "").split("@")[-1] if v.get("email") and "@" in v["email"] else None
-                    existing = await db.execute(
-                        select(VendorCache).where(VendorCache.odoo_id == v["id"])
-                    )
-                    cached = existing.scalar_one_or_none()
+                    cached = vendor_cache_map.get(v["id"])
                     if cached:
                         cached.name = v["name"]
                         cached.email = v.get("email")

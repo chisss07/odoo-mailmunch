@@ -37,42 +37,52 @@ async def poll_m365_mailbox(ctx: dict):
                 client_id=settings_map["m365_client_id"],
                 client_secret=settings_map["m365_client_secret"],
             )
-            graph_client = GraphServiceClient(credential)
+            try:
+                graph_client = GraphServiceClient(credential)
 
-            folder = settings_map.get("m365_mailbox_folder", "Inbox")
+                folder = settings_map.get("m365_mailbox_folder", "Inbox")
 
-            # Fetch unread messages
-            messages = await graph_client.me.mail_folders.by_mail_folder_id(folder).messages.get(
-                query_params={"$filter": "isRead eq false", "$top": 20, "$select": "sender,subject,body,hasAttachments"},
-            )
-
-            if not messages or not messages.value:
-                await credential.close()
-                return
-
-            for msg in messages.value:
-                sender = msg.sender.email_address.address if msg.sender else ""
-                sender_domain = sender.split("@")[-1] if "@" in sender else ""
-
-                email_record = Email(
-                    sender=sender,
-                    sender_domain=sender_domain,
-                    subject=msg.subject or "",
-                    body_text=msg.body.content if msg.body else "",
-                    source=EmailSource.M365,
-                    status=EmailStatus.PROCESSING,
-                    classification=EmailClassification.UNCLASSIFIED,
-                    user_id=0,  # TODO(Task 12): ARQ worker must reassign to correct user before processing
+                # Fetch unread messages
+                messages = await graph_client.me.mail_folders.by_mail_folder_id(folder).messages.get(
+                    query_params={"$filter": "isRead eq false", "$top": 20, "$select": "sender,subject,body,hasAttachments"},
                 )
-                db.add(email_record)
 
-                # Mark as read
-                await graph_client.me.messages.by_message_id(msg.id).patch({"isRead": True})
+                if not messages or not messages.value:
+                    return
 
-            await db.commit()
-            logger.info(f"Polled {len(messages.value)} emails from M365")
+                # First pass: ingest emails into DB
+                message_ids = []
+                for msg in messages.value:
+                    sender = msg.sender.email_address.address if msg.sender else ""
+                    sender_domain = sender.split("@")[-1] if "@" in sender else ""
 
-            await credential.close()
+                    email_record = Email(
+                        sender=sender,
+                        sender_domain=sender_domain,
+                        subject=msg.subject or "",
+                        body_text=msg.body.content if msg.body else "",
+                        source=EmailSource.M365,
+                        status=EmailStatus.PROCESSING,
+                        classification=EmailClassification.UNCLASSIFIED,
+                        user_id=0,  # TODO: resolve user from M365 settings
+                    )
+                    db.add(email_record)
+                    message_ids.append(msg.id)
 
-        except Exception as e:
-            logger.error(f"M365 poll error: {e}")
+                await db.commit()
+                logger.info(f"Polled {len(message_ids)} emails from M365")
+
+                # Second pass: mark as read (after commit so no data loss)
+                for msg_id in message_ids:
+                    try:
+                        await graph_client.me.messages.by_message_id(msg_id).patch({"isRead": True})
+                    except Exception:
+                        logger.warning(f"Failed to mark message {msg_id} as read")
+
+            finally:
+                await credential.close()
+
+        except ImportError:
+            logger.error("M365 SDK not installed (azure-identity, msgraph-sdk)")
+        except Exception:
+            logger.error("M365 poll error", exc_info=True)

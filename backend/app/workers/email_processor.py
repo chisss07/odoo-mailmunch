@@ -56,18 +56,18 @@ async def process_pending_emails(ctx: dict):
             )
             email_record.classification = EmailClassification(classification)
 
-            if classification == "unclassified":
+            if email_record.classification == EmailClassification.UNCLASSIFIED:
                 email_record.status = EmailStatus.TRIAGE
                 continue
 
-            if classification == "shipping_notice":
+            if email_record.classification == EmailClassification.SHIPPING_NOTICE:
                 # Parse tracking info and try to link to existing PO
-                parse_tracking_info(email_record.body_text)
+                tracking = parse_tracking_info(email_record.body_text)
                 # TODO: Link tracking to existing PO by vendor match
                 email_record.status = EmailStatus.REVIEWED
                 continue
 
-            if classification == "bill":
+            if email_record.classification == EmailClassification.BILL:
                 email_record.status = EmailStatus.TRIAGE  # Future: handle bills
                 continue
 
