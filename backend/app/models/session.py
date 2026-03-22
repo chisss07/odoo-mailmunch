@@ -12,7 +12,7 @@ class UserSession(Base):
     odoo_uid: Mapped[int]
     odoo_url: Mapped[str] = mapped_column(String(500))
     odoo_db: Mapped[str] = mapped_column(String(200))
-    odoo_session_encrypted: Mapped[str] = mapped_column(Text)
+    odoo_api_key_encrypted: Mapped[str] = mapped_column(Text)
     jwt_token: Mapped[str] = mapped_column(Text, unique=True, index=True)
     refresh_token: Mapped[str] = mapped_column(Text, unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

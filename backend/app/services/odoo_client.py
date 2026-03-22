@@ -1,3 +1,4 @@
+import xmlrpc.client
 from typing import Any
 
 import httpx
@@ -7,19 +8,23 @@ class OdooError(Exception):
     pass
 
 
-class OdooSessionExpired(OdooError):
+class OdooAuthError(OdooError):
     pass
 
 
+# Keep for backwards compat in error handling
+OdooSessionExpired = OdooAuthError
+
+
 class OdooClient:
-    def __init__(self, url: str, db: str, uid: int, session_id: str):
+    """Odoo XML-RPC client using API key authentication (stateless, no session cookies)."""
+
+    def __init__(self, url: str, db: str, uid: int, api_key: str):
         self.url = url.rstrip("/")
         self.db = db
         self.uid = uid
-        self._http = httpx.AsyncClient(
-            cookies={"session_id": session_id},
-            timeout=30.0,
-        )
+        self.api_key = api_key
+        self._http = httpx.AsyncClient(timeout=30.0)
 
     async def __aenter__(self):
         return self
@@ -28,30 +33,23 @@ class OdooClient:
         await self.close()
 
     async def call(self, model: str, method: str, args: list, kwargs: dict | None = None) -> Any:
-        payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "call",
-            "params": {
-                "service": "object",
-                "method": "execute_kw",
-                "args": [self.db, self.uid, "unused", model, method, args, kwargs or {}],
-            },
-        }
-        response = await self._http.post(f"{self.url}/jsonrpc", json=payload)
+        """Execute an Odoo RPC call via XML-RPC object endpoint."""
+        xml_args = (self.db, self.uid, self.api_key, model, method, args, kwargs or {})
+        body = xmlrpc.client.dumps(xml_args, "execute_kw")
+
+        response = await self._http.post(
+            f"{self.url}/xmlrpc/2/object",
+            content=body,
+            headers={"Content-Type": "text/xml"},
+        )
         response.raise_for_status()
-        data = response.json()
 
-        if "error" in data:
-            error_msg = data["error"].get("data", {}).get("message", data["error"].get("message", "Unknown error"))
-            if "Session" in str(error_msg) and "expired" in str(error_msg).lower():
-                raise OdooSessionExpired(error_msg)
-            raise OdooError(error_msg)
-
-        return data.get("result")
+        result = xmlrpc.client.loads(response.text)
+        # xmlrpc.client.loads returns (params_tuple, method_name)
+        return result[0][0]
 
     async def search_read(self, model: str, domain: list, fields: list, limit: int = 0, offset: int = 0) -> list:
-        kwargs = {"fields": fields}
+        kwargs: dict[str, Any] = {"fields": fields}
         if limit:
             kwargs["limit"] = limit
         if offset:

@@ -24,7 +24,7 @@ def upgrade() -> None:
         sa.Column("odoo_uid", sa.Integer(), nullable=False),
         sa.Column("odoo_url", sa.String(500), nullable=False),
         sa.Column("odoo_db", sa.String(200), nullable=False),
-        sa.Column("odoo_session_encrypted", sa.Text(), nullable=False),
+        sa.Column("odoo_api_key_encrypted", sa.Text(), nullable=False),
         sa.Column("jwt_token", sa.Text(), nullable=False),
         sa.Column("refresh_token", sa.Text(), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),

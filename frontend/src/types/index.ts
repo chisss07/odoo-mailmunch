@@ -2,19 +2,12 @@ export interface LoginRequest {
   odoo_url: string
   database: string
   email: string
-  password: string
-}
-
-export interface TOTPRequest {
-  totp_session: string
-  totp_code: string
+  api_key: string
 }
 
 export interface AuthResponse {
-  access_token?: string
-  refresh_token?: string
-  needs_totp: boolean
-  totp_session?: string
+  access_token: string
+  refresh_token: string
 }
 
 export interface EmailRecord {

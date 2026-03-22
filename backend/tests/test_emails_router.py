@@ -18,7 +18,7 @@ async def _insert_session(db_session, token: str):
         odoo_uid=42,
         odoo_url="https://test.odoo.com",
         odoo_db="testdb",
-        odoo_session_encrypted=encrypt("fake-session"),
+        odoo_api_key_encrypted=encrypt("fake-api-key"),
         jwt_token=token,
         refresh_token="fake-refresh-emails",
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1),

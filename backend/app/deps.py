@@ -32,10 +32,10 @@ async def get_current_user(
 
 
 async def get_odoo_client(session: UserSession = Depends(get_current_user)) -> OdooClient:
-    odoo_session = decrypt(session.odoo_session_encrypted)
+    api_key = decrypt(session.odoo_api_key_encrypted)
     return OdooClient(
         url=session.odoo_url,
         db=session.odoo_db,
         uid=session.odoo_uid,
-        session_id=odoo_session,
+        api_key=api_key,
     )

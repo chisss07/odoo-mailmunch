@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,9 +9,9 @@ from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.models.session import UserSession
-from app.services.encryption import encrypt, decrypt
+from app.services.encryption import encrypt
 from app.services.jwt_service import create_access_token, create_refresh_token, verify_token
-from app.services.odoo_auth import authenticate_odoo, verify_totp
+from app.services.odoo_auth import authenticate_odoo
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -21,12 +20,7 @@ class LoginRequest(BaseModel):
     odoo_url: str
     database: str
     email: str
-    password: str
-
-
-class TOTPRequest(BaseModel):
-    totp_session: str
-    totp_code: str
+    api_key: str
 
 
 class RefreshRequest(BaseModel):
@@ -36,48 +30,35 @@ class RefreshRequest(BaseModel):
 @router.post("/login")
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     try:
-        result = await authenticate_odoo(req.odoo_url, req.database, req.email, req.password)
+        result = await authenticate_odoo(req.odoo_url, req.database, req.email, req.api_key)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
-    if result["needs_totp"]:
-        totp_data = json.dumps({
-            "uid": result["uid"],
-            "session_id": result["session_id"],
-            "odoo_url": req.odoo_url,
-            "database": req.database,
-        })
-        totp_session = encrypt(totp_data)
-        return {"needs_totp": True, "totp_session": totp_session}
+    uid = result["uid"]
+    access_token = create_access_token(user_id=uid, odoo_uid=uid, odoo_url=req.odoo_url)
+    refresh_token = create_refresh_token(user_id=uid)
 
-    return await _create_session(db, result["uid"], result["session_id"], req.odoo_url, req.database)
+    session = UserSession(
+        user_id=uid,
+        odoo_uid=uid,
+        odoo_url=req.odoo_url,
+        odoo_db=req.database,
+        odoo_api_key_encrypted=encrypt(req.api_key),
+        jwt_token=access_token,
+        refresh_token=refresh_token,
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expiry_minutes),
+        refresh_expires_at=datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expiry_days),
+    )
+    db.add(session)
+    await db.commit()
 
-
-@router.post("/totp")
-async def complete_totp(req: TOTPRequest, db: AsyncSession = Depends(get_db)):
-    try:
-        plain = decrypt(req.totp_session)
-        totp_data = json.loads(plain)
-        uid_str = str(totp_data["uid"])
-        session_id = totp_data["session_id"]
-        odoo_url = totp_data["odoo_url"]
-        odoo_db = totp_data["database"]
-        uid = int(uid_str)
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid TOTP session")
-
-    try:
-        totp_result = await verify_totp(odoo_url, session_id, req.totp_code)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
-
-    return await _create_session(db, uid, totp_result["session_id"], odoo_url, odoo_db)
+    return {"access_token": access_token, "refresh_token": refresh_token}
 
 
 @router.post("/refresh")
 async def refresh(req: RefreshRequest, db: AsyncSession = Depends(get_db)):
     try:
-        payload = verify_token(req.refresh_token, expected_type="refresh")
+        verify_token(req.refresh_token, expected_type="refresh")
     except ValueError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
@@ -98,7 +79,7 @@ async def refresh(req: RefreshRequest, db: AsyncSession = Depends(get_db)):
 
     await db.commit()
 
-    return {"access_token": access_token, "refresh_token": refresh_token, "needs_totp": False}
+    return {"access_token": access_token, "refresh_token": refresh_token}
 
 
 @router.post("/logout")
@@ -111,22 +92,6 @@ async def logout(
     return {"status": "ok"}
 
 
-async def _create_session(db: AsyncSession, uid: int, session_id: str, odoo_url: str, odoo_db: str) -> dict:
-    access_token = create_access_token(user_id=uid, odoo_uid=uid, odoo_url=odoo_url)
-    refresh_token = create_refresh_token(user_id=uid)
-
-    session = UserSession(
-        user_id=uid,
-        odoo_uid=uid,
-        odoo_url=odoo_url,
-        odoo_db=odoo_db,
-        odoo_session_encrypted=encrypt(session_id),
-        jwt_token=access_token,
-        refresh_token=refresh_token,
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expiry_minutes),
-        refresh_expires_at=datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expiry_days),
-    )
-    db.add(session)
-    await db.commit()
-
-    return {"access_token": access_token, "refresh_token": refresh_token, "needs_totp": False}
+@router.get("/session")
+async def get_session(current_user: UserSession = Depends(get_current_user)):
+    return {"odoo_url": current_user.odoo_url, "database": current_user.odoo_db}

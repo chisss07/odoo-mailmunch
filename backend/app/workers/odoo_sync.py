@@ -22,10 +22,10 @@ async def sync_po_statuses(ctx: dict):
 
         for session in sessions:
             try:
-                odoo_session = decrypt(session.odoo_session_encrypted)
+                api_key = decrypt(session.odoo_api_key_encrypted)
                 client = OdooClient(
                     url=session.odoo_url, db=session.odoo_db,
-                    uid=session.odoo_uid, session_id=odoo_session,
+                    uid=session.odoo_uid, api_key=api_key,
                 )
 
                 # Get open POs for this user
@@ -70,10 +70,10 @@ async def refresh_caches(ctx: dict):
 
         for session in sessions:
             try:
-                odoo_session = decrypt(session.odoo_session_encrypted)
+                api_key = decrypt(session.odoo_api_key_encrypted)
                 client = OdooClient(
                     url=session.odoo_url, db=session.odoo_db,
-                    uid=session.odoo_uid, session_id=odoo_session,
+                    uid=session.odoo_uid, api_key=api_key,
                 )
 
                 # Refresh products

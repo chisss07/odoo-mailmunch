@@ -8,50 +8,32 @@ from app.services.jwt_service import create_access_token, create_refresh_token
 
 
 @pytest.mark.asyncio
-async def test_login_success_no_2fa(client):
-    mock_auth = AsyncMock(return_value={"uid": 42, "session_id": "abc123", "needs_totp": False})
+async def test_login_success(client):
+    mock_auth = AsyncMock(return_value={"uid": 42})
 
     with patch("app.routers.auth.authenticate_odoo", mock_auth):
         response = await client.post("/api/auth/login", json={
             "odoo_url": "https://test.odoo.com",
             "database": "testdb",
             "email": "user@test.com",
-            "password": "password123",
+            "api_key": "test-api-key",
         })
         assert response.status_code == 200
         data = response.json()
         assert "access_token" in data
         assert "refresh_token" in data
-        assert data["needs_totp"] is False
-
-
-@pytest.mark.asyncio
-async def test_login_needs_totp(client):
-    mock_auth = AsyncMock(return_value={"uid": 42, "session_id": "abc123", "needs_totp": True})
-
-    with patch("app.routers.auth.authenticate_odoo", mock_auth):
-        response = await client.post("/api/auth/login", json={
-            "odoo_url": "https://test.odoo.com",
-            "database": "testdb",
-            "email": "user@test.com",
-            "password": "password123",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["needs_totp"] is True
-        assert "totp_session" in data
 
 
 @pytest.mark.asyncio
 async def test_login_invalid_credentials(client):
-    mock_auth = AsyncMock(side_effect=ValueError("Invalid credentials"))
+    mock_auth = AsyncMock(side_effect=ValueError("Invalid credentials or API key"))
 
     with patch("app.routers.auth.authenticate_odoo", mock_auth):
         response = await client.post("/api/auth/login", json={
             "odoo_url": "https://test.odoo.com",
             "database": "testdb",
             "email": "bad@test.com",
-            "password": "wrong",
+            "api_key": "wrong-key",
         })
         assert response.status_code == 401
 
@@ -66,7 +48,7 @@ async def test_logout_deletes_session(client, db_session):
         odoo_uid=1,
         odoo_url="https://test.odoo.com",
         odoo_db="testdb",
-        odoo_session_encrypted=encrypt("session-xyz"),
+        odoo_api_key_encrypted=encrypt("test-api-key"),
         jwt_token=access_token,
         refresh_token=refresh_token,
         expires_at=now + timedelta(minutes=30),
@@ -82,7 +64,6 @@ async def test_logout_deletes_session(client, db_session):
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
-    # Confirm the row is gone
     from sqlalchemy import select
     result = await db_session.execute(select(UserSession).where(UserSession.jwt_token == access_token))
     assert result.scalar_one_or_none() is None
@@ -98,7 +79,7 @@ async def test_refresh_returns_new_tokens(client, db_session):
         odoo_uid=2,
         odoo_url="https://test.odoo.com",
         odoo_db="testdb",
-        odoo_session_encrypted=encrypt("session-abc"),
+        odoo_api_key_encrypted=encrypt("test-api-key"),
         jwt_token=access_token,
         refresh_token=refresh_token,
         expires_at=now + timedelta(minutes=30),
@@ -115,8 +96,6 @@ async def test_refresh_returns_new_tokens(client, db_session):
     data = response.json()
     assert "access_token" in data
     assert "refresh_token" in data
-    assert data["needs_totp"] is False
-    # New tokens must differ from the originals
     assert data["access_token"] != access_token
     assert data["refresh_token"] != refresh_token
 
