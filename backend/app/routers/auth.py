@@ -20,7 +20,16 @@ class LoginRequest(BaseModel):
     odoo_url: str
     database: str
     email: str
-    api_key: str
+    api_key: str | None = None
+    password: str | None = None
+
+    def get_credential(self) -> str:
+        if self.api_key and self.password:
+            raise ValueError("Provide either api_key or password, not both")
+        credential = self.api_key or self.password
+        if not credential:
+            raise ValueError("Either api_key or password is required")
+        return credential
 
 
 class RefreshRequest(BaseModel):
@@ -30,7 +39,12 @@ class RefreshRequest(BaseModel):
 @router.post("/login")
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     try:
-        result = await authenticate_odoo(req.odoo_url, req.database, req.email, req.api_key)
+        credential = req.get_credential()
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+    try:
+        result = await authenticate_odoo(req.odoo_url, req.database, req.email, credential)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
@@ -43,7 +57,7 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         odoo_uid=uid,
         odoo_url=req.odoo_url,
         odoo_db=req.database,
-        odoo_api_key_encrypted=encrypt(req.api_key),
+        odoo_api_key_encrypted=encrypt(credential),
         jwt_token=access_token,
         refresh_token=refresh_token,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expiry_minutes),

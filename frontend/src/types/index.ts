@@ -1,8 +1,11 @@
+export type AuthMethod = 'api_key' | 'password'
+
 export interface LoginRequest {
   odoo_url: string
   database: string
   email: string
-  api_key: string
+  api_key?: string
+  password?: string
 }
 
 export interface AuthResponse {

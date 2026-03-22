@@ -25,6 +25,33 @@ async def test_login_success(client):
 
 
 @pytest.mark.asyncio
+async def test_login_with_password(client):
+    mock_auth = AsyncMock(return_value={"uid": 42})
+
+    with patch("app.routers.auth.authenticate_odoo", mock_auth):
+        response = await client.post("/api/auth/login", json={
+            "odoo_url": "https://test.odoo.com",
+            "database": "testdb",
+            "email": "user@test.com",
+            "password": "my-password",
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        mock_auth.assert_called_once_with("https://test.odoo.com", "testdb", "user@test.com", "my-password")
+
+
+@pytest.mark.asyncio
+async def test_login_no_credential_fails(client):
+    response = await client.post("/api/auth/login", json={
+        "odoo_url": "https://test.odoo.com",
+        "database": "testdb",
+        "email": "user@test.com",
+    })
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_login_invalid_credentials(client):
     mock_auth = AsyncMock(side_effect=ValueError("Invalid credentials or API key"))
 

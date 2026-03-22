@@ -40,8 +40,13 @@ async def authenticate_odoo(url: str, db: str, login: str, api_key: str) -> dict
         )
         response.raise_for_status()
 
-    result = xmlrpc.client.loads(response.text)
-    uid = result[0][0]
+    try:
+        result = xmlrpc.client.loads(response.text)
+        uid = result[0][0]
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"XML-RPC parse error: {e}, response: {response.text[:500]}")
+        raise ValueError(f"Unexpected Odoo response: {e}")
 
     if not uid:
         raise ValueError("Invalid credentials or API key")
