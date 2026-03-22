@@ -26,7 +26,7 @@ async def authenticate_odoo(url: str, db: str, login: str, password: str) -> dic
         raise ValueError("Invalid credentials")
 
     # Check if 2FA/TOTP is required
-    needs_totp = result.get("totp") is True or "totp" in str(result.get("error", "")).lower()
+    needs_totp = result.get("totp") is True
 
     # Extract session_id from response cookies or result
     session_id = None
