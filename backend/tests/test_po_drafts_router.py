@@ -49,7 +49,7 @@ async def _insert_draft(db_session, vendor_odoo_id=10, line_items=None, status=D
 @pytest.mark.asyncio
 async def test_list_drafts_empty(client, db_session):
     headers = await _setup_auth(db_session)
-    response = await client.get("/api/drafts/", headers=headers)
+    response = await client.get("/api/drafts", headers=headers)
     assert response.status_code == 200
     assert response.json() == []
 
@@ -59,7 +59,7 @@ async def test_list_drafts_excludes_submitted(client, db_session):
     headers = await _setup_auth(db_session)
     await _insert_draft(db_session, status=DraftStatus.DRAFT)
     await _insert_draft(db_session, status=DraftStatus.SUBMITTED)
-    response = await client.get("/api/drafts/", headers=headers)
+    response = await client.get("/api/drafts", headers=headers)
     assert response.status_code == 200
     assert len(response.json()) == 1
 

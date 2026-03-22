@@ -151,7 +151,7 @@ async def inbound_email_webhook(
     return {"status": "accepted"}
 
 
-@router.get("/")
+@router.get("")
 async def list_emails(
     status: str | None = None,
     db: AsyncSession = Depends(get_db),

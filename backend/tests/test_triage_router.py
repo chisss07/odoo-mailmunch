@@ -46,7 +46,7 @@ async def _insert_email(db_session, sender="vendor@acme.com", sender_domain="acm
 @pytest.mark.asyncio
 async def test_list_triage_empty(client, db_session):
     headers = await _setup_auth(db_session)
-    response = await client.get("/api/triage/", headers=headers)
+    response = await client.get("/api/triage", headers=headers)
     assert response.status_code == 200
     assert response.json() == []
 
@@ -56,7 +56,7 @@ async def test_list_triage_returns_only_triage_status(client, db_session):
     headers = await _setup_auth(db_session)
     await _insert_email(db_session, status=EmailStatus.TRIAGE)
     await _insert_email(db_session, status=EmailStatus.PROCESSING)
-    response = await client.get("/api/triage/", headers=headers)
+    response = await client.get("/api/triage", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1

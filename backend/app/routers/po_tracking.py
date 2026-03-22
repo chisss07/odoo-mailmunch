@@ -19,7 +19,7 @@ class ReceiveRequest(BaseModel):
     lines: list[dict] | None = None
 
 
-@router.get("/")
+@router.get("")
 async def list_pos(
     status: str | None = None,
     db: AsyncSession = Depends(get_db),

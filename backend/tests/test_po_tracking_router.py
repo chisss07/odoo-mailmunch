@@ -44,7 +44,7 @@ async def _insert_tracking(db_session, status=POStatus.ordered):
 @pytest.mark.asyncio
 async def test_list_pos_empty(client, db_session):
     headers = await _setup_auth(db_session)
-    response = await client.get("/api/pos/", headers=headers)
+    response = await client.get("/api/pos", headers=headers)
     assert response.status_code == 200
     assert response.json() == []
 
@@ -53,7 +53,7 @@ async def test_list_pos_empty(client, db_session):
 async def test_list_pos(client, db_session):
     headers = await _setup_auth(db_session)
     await _insert_tracking(db_session)
-    response = await client.get("/api/pos/", headers=headers)
+    response = await client.get("/api/pos", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
@@ -66,7 +66,7 @@ async def test_list_pos_filter_by_status(client, db_session):
     headers = await _setup_auth(db_session)
     await _insert_tracking(db_session, status=POStatus.ordered)
     await _insert_tracking(db_session, status=POStatus.received)
-    response = await client.get("/api/pos/?status=ordered", headers=headers)
+    response = await client.get("/api/pos?status=ordered", headers=headers)
     assert response.status_code == 200
     assert len(response.json()) == 1
 

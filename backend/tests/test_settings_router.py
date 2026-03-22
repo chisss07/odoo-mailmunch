@@ -25,7 +25,7 @@ async def _insert_session(db_session, token: str):
 async def test_get_settings_empty(client, db_session):
     token = create_access_token(user_id=1, odoo_uid=42, odoo_url="https://test.odoo.com")
     await _insert_session(db_session, token)
-    response = await client.get("/api/settings/", headers={"Authorization": f"Bearer {token}"})
+    response = await client.get("/api/settings", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert response.json() == {}
 
@@ -37,13 +37,13 @@ async def test_update_and_get_setting(client, db_session):
     headers = {"Authorization": f"Bearer {token}"}
 
     response = await client.put(
-        "/api/settings/",
+        "/api/settings",
         json={"key": "sync_interval", "value": "60"},
         headers=headers,
     )
     assert response.status_code == 200
 
-    response = await client.get("/api/settings/", headers=headers)
+    response = await client.get("/api/settings", headers=headers)
     assert response.status_code == 200
     assert response.json()["sync_interval"] == "60"
 

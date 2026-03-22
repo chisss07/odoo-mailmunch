@@ -16,7 +16,7 @@ class TriageAction(BaseModel):
     action: str  # "import_po", "track_shipment", "ignore", "always_ignore_sender"
 
 
-@router.get("/")
+@router.get("")
 async def list_triage(
     db: AsyncSession = Depends(get_db),
     user: UserSession = Depends(get_current_user),

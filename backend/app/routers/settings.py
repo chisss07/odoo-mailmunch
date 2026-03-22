@@ -26,7 +26,7 @@ class IgnoreRuleCreate(BaseModel):
     value: str
 
 
-@router.get("/")
+@router.get("")
 async def get_settings(
     db: AsyncSession = Depends(get_db),
     user: UserSession = Depends(get_current_user),
@@ -42,7 +42,7 @@ async def get_settings(
     return output
 
 
-@router.put("/")
+@router.put("")
 async def update_setting(
     update: SettingUpdate,
     db: AsyncSession = Depends(get_db),

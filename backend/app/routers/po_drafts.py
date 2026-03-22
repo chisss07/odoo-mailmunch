@@ -24,7 +24,7 @@ class DraftUpdate(BaseModel):
     sales_order_name: str | None = None
 
 
-@router.get("/")
+@router.get("")
 async def list_drafts(
     db: AsyncSession = Depends(get_db),
     user: UserSession = Depends(get_current_user),

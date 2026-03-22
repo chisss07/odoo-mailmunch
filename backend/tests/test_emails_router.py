@@ -50,7 +50,7 @@ async def test_list_emails_empty(client, db_session):
     await _insert_session(db_session, token)
 
     response = await client.get(
-        "/api/emails/",
+        "/api/emails",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 200
