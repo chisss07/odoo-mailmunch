@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from jose import JWTError, jwt
+import jwt as pyjwt
+from jwt.exceptions import InvalidTokenError
 
 from app.config import settings
 
@@ -16,7 +17,7 @@ def create_access_token(user_id: int, odoo_uid: int, odoo_url: str) -> str:
         "type": "access",
         "exp": expire,
     }
-    return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
+    return pyjwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
 
 def create_refresh_token(user_id: int) -> str:
@@ -26,11 +27,14 @@ def create_refresh_token(user_id: int) -> str:
         "type": "refresh",
         "exp": expire,
     }
-    return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
+    return pyjwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
 
-def verify_token(token: str) -> dict:
+def verify_token(token: str, expected_type: str | None = None) -> dict:
     try:
-        return jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
-    except JWTError as e:
+        payload = pyjwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+    except InvalidTokenError as e:
         raise ValueError(f"Invalid token: {e}") from e
+    if expected_type and payload.get("type") != expected_type:
+        raise ValueError(f"Expected token type '{expected_type}', got '{payload.get('type')}'")
+    return payload

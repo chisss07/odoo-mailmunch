@@ -1,3 +1,5 @@
+from typing import Any
+
 import httpx
 
 
@@ -19,7 +21,13 @@ class OdooClient:
             timeout=30.0,
         )
 
-    async def call(self, model: str, method: str, args: list, kwargs: dict | None = None) -> any:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
+
+    async def call(self, model: str, method: str, args: list, kwargs: dict | None = None) -> Any:
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
