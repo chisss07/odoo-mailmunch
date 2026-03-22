@@ -196,12 +196,6 @@ function OdooSection() {
 
 // ─── Sync Settings Section ────────────────────────────────────────────────────
 
-interface SyncData {
-  auto_sync_enabled: boolean
-  last_product_cache_refresh: string | null
-  last_vendor_cache_refresh: string | null
-}
-
 function SyncSection({ settings, onSettingsChange }: {
   settings: Setting[]
   onSettingsChange: () => void
