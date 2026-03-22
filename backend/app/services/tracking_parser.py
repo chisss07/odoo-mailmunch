@@ -6,9 +6,9 @@ CARRIER_PATTERNS = {
         "url_template": "https://www.ups.com/track?tracknum={number}",
     },
     "FedEx": {
-        "pattern": r"\b\d{12,15}\b",
+        "pattern": r"\b((?:61|96|98|77|01|02)\d{10,11}|(?:7489|7491)\d{12})\b",
         "url_template": "https://www.fedex.com/fedextrack/?trknbr={number}",
-        "context_required": True,  # Needs "fedex" nearby to avoid false positives
+        "context_required": True,
     },
     "USPS": {
         "pattern": r"\b(9[2-4]\d{20,22})\b",

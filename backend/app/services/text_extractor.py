@@ -12,20 +12,20 @@ class _HTMLTextExtractor(HTMLParser):
     def __init__(self):
         super().__init__()
         self._text = StringIO()
-        self._skip = False
+        self._skip_depth = 0
 
     def handle_starttag(self, tag, attrs):
         if tag in ("script", "style"):
-            self._skip = True
+            self._skip_depth += 1
         if tag in ("br", "p", "div", "li", "tr"):
             self._text.write("\n")
 
     def handle_endtag(self, tag):
         if tag in ("script", "style"):
-            self._skip = False
+            self._skip_depth = max(0, self._skip_depth - 1)
 
     def handle_data(self, data):
-        if not self._skip:
+        if not self._skip_depth:
             self._text.write(data)
 
     def get_text(self) -> str:
@@ -96,11 +96,13 @@ def extract_text_from_pdf(file_path: str | Path) -> str:
 
 def extract_text_from_xlsx(file_path: str | Path) -> str:
     wb = openpyxl.load_workbook(file_path, read_only=True)
-    text_parts = []
-    for sheet in wb.worksheets:
-        for row in sheet.iter_rows(values_only=True):
-            row_text = " | ".join(str(cell) for cell in row if cell is not None)
-            if row_text:
-                text_parts.append(row_text)
-    wb.close()
-    return "\n".join(text_parts)
+    try:
+        text_parts = []
+        for sheet in wb.worksheets:
+            for row in sheet.iter_rows(values_only=True):
+                row_text = " | ".join(str(cell) for cell in row if cell is not None)
+                if row_text:
+                    text_parts.append(row_text)
+        return "\n".join(text_parts)
+    finally:
+        wb.close()

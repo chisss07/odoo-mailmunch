@@ -37,4 +37,4 @@ def test_no_match():
         {"odoo_id": 10, "name": "Widget A", "default_code": "WA-100", "description": ""},
     ]
     result = match_product(description="Completely Different Item", sku="ZZZZZ", products=products)
-    assert result is None or result["confidence"] == "low"
+    assert result is None

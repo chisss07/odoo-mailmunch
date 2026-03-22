@@ -27,3 +27,8 @@ def test_no_match():
     ]
     result = match_vendor(sender="unknown@nowhere.com", sender_domain="nowhere.com", vendors=vendors)
     assert result is None
+
+
+def test_match_vendor_empty_list():
+    result = match_vendor(sender="orders@acme.com", sender_domain="acme.com", vendors=[])
+    assert result is None

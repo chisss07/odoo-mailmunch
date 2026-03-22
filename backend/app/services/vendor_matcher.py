@@ -19,7 +19,10 @@ def match_vendor(
 
     if name_to_match:
         for vendor in vendors:
-            score = fuzz.token_sort_ratio(name_to_match.lower(), vendor["name"].lower())
+            vendor_name = vendor.get("name", "")
+            if not vendor_name:
+                continue
+            score = fuzz.token_sort_ratio(name_to_match.lower(), vendor_name.lower())
             if score > best_score and score >= 70:
                 best_score = score
                 best_match = vendor

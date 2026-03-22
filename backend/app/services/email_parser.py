@@ -39,7 +39,7 @@ LINE_ITEM_PATTERNS = [
 ]
 
 # Pattern for informal "N items at $X each"
-INFORMAL_PATTERN = r"(\d+)\s+(\w[\w\s]*?)\s+(?:at|@)\s+\$?([\d,.]+)\s*(?:each|ea|per)?"
+INFORMAL_PATTERN = r"(\d+)\s+(\w[\w\s]{1,50}?)\s+(?:at|@)\s+\$?([\d,.]+)\s*(?:each|ea|per)?"
 
 # Date patterns
 DATE_PATTERNS = [
@@ -100,17 +100,25 @@ def _extract_line_items(text: str) -> list[LineItem]:
             elif len(groups) == 3:
                 # Check if first group is numeric (qty x desc @ price)
                 if groups[0].replace(",", "").isdigit():
+                    qty_val = float(groups[0].replace(",", ""))
+                    price_val = float(groups[2].replace(",", ""))
+                    if qty_val > 50000 or price_val > 500000:
+                        continue
                     pattern_items.append(LineItem(
                         description=groups[1].strip(),
-                        quantity=float(groups[0].replace(",", "")),
-                        unit_price=float(groups[2].replace(",", "")),
+                        quantity=qty_val,
+                        unit_price=price_val,
                         confidence="medium",
                     ))
                 else:
+                    qty_val = float(groups[1].replace(",", ""))
+                    price_val = float(groups[2].replace(",", ""))
+                    if qty_val > 50000 or price_val > 500000:
+                        continue
                     pattern_items.append(LineItem(
                         description=groups[0].strip(),
-                        quantity=float(groups[1].replace(",", "")),
-                        unit_price=float(groups[2].replace(",", "")),
+                        quantity=qty_val,
+                        unit_price=price_val,
                         confidence="medium",
                     ))
         if pattern_items:

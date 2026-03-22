@@ -15,6 +15,14 @@ def test_html_to_text_empty():
     assert html_to_text(None) == ""
 
 
+def test_html_to_text_ignores_style_content():
+    html = "<html><head><style>body { color: red; font-size: 14px; }</style></head><body><p>Hello</p></body></html>"
+    result = html_to_text(html)
+    assert "color" not in result
+    assert "font-size" not in result
+    assert "Hello" in result
+
+
 def test_extract_text_from_eml_plain():
     eml_content = (
         "From: vendor@acme.com\r\n"
