@@ -42,7 +42,7 @@ export default function LoginPage({ auth }: LoginPageProps) {
         <h1 className="text-white text-xl font-semibold mb-6">MailMunch Login</h1>
 
         {/* Auth method toggle */}
-        <div className="flex mb-5 bg-surface rounded-lg p-1">
+        <div className="flex mb-5 bg-surface border border-white/20 rounded-lg p-1">
           {(['api_key', 'password'] as AuthMethod[]).map(m => (
             <button
               key={m}
