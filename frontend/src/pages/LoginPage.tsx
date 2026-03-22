@@ -21,7 +21,12 @@ const CREDENTIAL_FIELD: Record<AuthMethod, { key: keyof LoginRequest; label: str
 
 export default function LoginPage({ auth }: LoginPageProps) {
   const [method, setMethod] = useState<AuthMethod>('api_key')
-  const [form, setForm] = useState({ odoo_url: '', database: '', email: '', credential: '' })
+  const [form, setForm] = useState(() => ({
+    odoo_url: localStorage.getItem('saved_odoo_url') || '',
+    database: localStorage.getItem('saved_database') || '',
+    email: localStorage.getItem('saved_email') || '',
+    credential: '',
+  }))
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()

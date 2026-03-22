@@ -19,6 +19,10 @@ export function useAuth() {
       }
       localStorage.setItem('access_token', data.access_token)
       localStorage.setItem('refresh_token', data.refresh_token)
+      // Save non-sensitive fields for form pre-fill (never store passwords/keys)
+      localStorage.setItem('saved_odoo_url', req.odoo_url)
+      localStorage.setItem('saved_database', req.database)
+      localStorage.setItem('saved_email', req.email)
       setIsAuthenticated(true)
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
