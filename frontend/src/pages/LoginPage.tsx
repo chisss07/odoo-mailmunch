@@ -1,9 +1,10 @@
 import { useState } from 'react'
+import type { LoginRequest } from '../types'
 
 interface AuthHook {
   needsTotp: boolean
   error: string
-  login: (req: { odoo_url: string; database: string; email: string; password: string }) => Promise<void>
+  login: (req: LoginRequest) => Promise<void>
   submitTotp: (code: string) => Promise<void>
 }
 

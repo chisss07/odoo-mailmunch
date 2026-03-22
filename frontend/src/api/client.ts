@@ -4,6 +4,9 @@ const api = axios.create({
   baseURL: '/api',
 })
 
+// Shared refresh promise to prevent concurrent 401s from triggering multiple refreshes
+let refreshPromise: Promise<string> | null = null
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) {
@@ -20,12 +23,21 @@ api.interceptors.response.use(
       if (refreshToken && !error.config._retry) {
         error.config._retry = true
         try {
-          const { data } = await axios.post('/api/auth/refresh', {
-            refresh_token: refreshToken,
-          })
-          localStorage.setItem('access_token', data.access_token)
-          localStorage.setItem('refresh_token', data.refresh_token)
-          error.config.headers.Authorization = `Bearer ${data.access_token}`
+          // Reuse an in-flight refresh to prevent concurrent token refresh races
+          if (!refreshPromise) {
+            refreshPromise = axios
+              .post('/api/auth/refresh', { refresh_token: refreshToken })
+              .then(({ data }) => {
+                localStorage.setItem('access_token', data.access_token)
+                localStorage.setItem('refresh_token', data.refresh_token)
+                return data.access_token as string
+              })
+              .finally(() => {
+                refreshPromise = null
+              })
+          }
+          const newToken = await refreshPromise
+          error.config.headers.Authorization = `Bearer ${newToken}`
           return api(error.config)
         } catch {
           localStorage.removeItem('access_token')

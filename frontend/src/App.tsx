@@ -10,25 +10,21 @@ import Layout from './components/Layout'
 function App() {
   const auth = useAuth()
 
-  if (!auth.isAuthenticated) {
-    return (
-      <BrowserRouter>
-        <LoginPage auth={auth} />
-      </BrowserRouter>
-    )
-  }
-
   return (
     <BrowserRouter>
-      <Layout onLogout={auth.logout}>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/review/:id" element={<EmailReviewPage />} />
-          <Route path="/receipt/:id" element={<ReceiptTrackerPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<DashboardPage />} />
-        </Routes>
-      </Layout>
+      {!auth.isAuthenticated ? (
+        <LoginPage auth={auth} />
+      ) : (
+        <Layout onLogout={auth.logout}>
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/review/:id" element={<EmailReviewPage />} />
+            <Route path="/receipt/:id" element={<ReceiptTrackerPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<DashboardPage />} />
+          </Routes>
+        </Layout>
+      )}
     </BrowserRouter>
   )
 }
