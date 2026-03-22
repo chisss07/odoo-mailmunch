@@ -38,7 +38,10 @@ async def test_login_with_password(client):
         assert response.status_code == 200
         data = response.json()
         assert "access_token" in data
-        mock_auth.assert_called_once_with("https://test.odoo.com", "testdb", "user@test.com", "my-password")
+        mock_auth.assert_called_once_with(
+            "https://test.odoo.com", "testdb", "user@test.com", "my-password",
+            is_api_key=False,
+        )
 
 
 @pytest.mark.asyncio

@@ -44,7 +44,10 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
     try:
-        result = await authenticate_odoo(req.odoo_url, req.database, req.email, credential)
+        result = await authenticate_odoo(
+            req.odoo_url, req.database, req.email, credential,
+            is_api_key=req.api_key is not None,
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
