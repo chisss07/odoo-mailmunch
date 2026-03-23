@@ -313,13 +313,23 @@ def parse_html_order_details(html: str) -> dict:
     from app.services.text_extractor import html_to_text
     plain = html_to_text(html)
 
-    # Get order number and total from plain text
-    order_number = _extract_first_match(plain, ORDER_PATTERNS)
+    # Try to extract order number from HTML first (handles Unicode RTL marks in Amazon emails)
+    html_order_match = re.search(r'Order\s*#\s*</span>\s*<span>[^\d]*(\d[\d\-]+\d)', html)
+    order_number = html_order_match.group(1) if html_order_match else _extract_first_match(plain, ORDER_PATTERNS)
     total_amount = _extract_total(plain)
     expected_date = _extract_first_match(plain, DATE_PATTERNS)
 
     # Extract items from HTML structure
     items = _extract_html_line_items(html)
+
+    # Try Amazon HTML format if generic HTML extraction found nothing
+    if not items:
+        items = _extract_amazon_html_items(html)
+
+    # Last resort: try text-based parsers on the converted plain text
+    if not items:
+        text_items = _extract_line_items(plain)
+        items = text_items
 
     return {
         "order_number": order_number,
@@ -419,6 +429,54 @@ def _extract_html_line_items(html: str) -> list[LineItem]:
             quantity=quantity,
             unit_price=unit_price,
             confidence="high" if sku and unit_price > 0 else "medium",
+        ))
+
+    return items
+
+
+def _extract_amazon_html_items(html: str) -> list[LineItem]:
+    """Parse Amazon order confirmation HTML.
+
+    Amazon HTML structure:
+      - Product link: <a href="...amazon.com/dp/ASIN...">Product Name...</a>
+      - Quantity: <span>Quantity: N</span>
+      - Price: aria-label="{amount=XX.XX, currencyCode=...}"
+    """
+    items = []
+
+    # Find product links to amazon.com/dp/ASIN
+    product_pattern = re.compile(
+        r'amazon\.com(?:%2F|/)dp(?:%2F|/)([A-Z0-9]+).*?'
+        r'["\'][^>]*>\s*(.*?)\s*</a>',
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    for match in product_pattern.finditer(html):
+        asin = match.group(1)
+        desc_raw = match.group(2)
+        description = re.sub(r"<[^>]+>", "", desc_raw).strip()
+        description = re.sub(r"\s+", " ", description)
+
+        if not description or len(description) < 3:
+            continue
+
+        # Search forward from this match for Quantity and price
+        window = html[match.end():match.end() + 2000]
+
+        # Quantity: N
+        qty_match = re.search(r"Quantity:\s*(\d+)", window)
+        quantity = float(qty_match.group(1)) if qty_match else 1.0
+
+        # Price from aria-label="{amount=XX.XX, ...}"
+        price_match = re.search(r'amount=([\d.]+)', window)
+        unit_price = float(price_match.group(1)) if price_match else 0.0
+
+        items.append(LineItem(
+            description=description,
+            sku=asin,
+            quantity=quantity,
+            unit_price=unit_price,
+            confidence="high" if unit_price > 0 else "medium",
         ))
 
     return items
