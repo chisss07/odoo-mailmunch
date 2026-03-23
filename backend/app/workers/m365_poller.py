@@ -13,13 +13,15 @@ logger = logging.getLogger(__name__)
 async def poll_m365_mailbox(ctx: dict):
     """Poll M365 mailbox for new emails via Microsoft Graph API.
 
-    Uses read-only access (Mail.Read). De-duplicates by storing the Graph
-    message ID in email.external_id so already-imported messages are skipped.
+    Uses app-only (client credentials) auth with read-only Mail.Read permission.
+    Requires m365_mailbox_user to target a specific user's mailbox since /me
+    is not available with app-only auth. De-duplicates via external_id.
     """
     async with async_session() as db:
         # Get M365 settings
         result = await db.execute(select(AppSettings).where(AppSettings.key.in_([
-            "m365_tenant_id", "m365_client_id", "m365_client_secret", "m365_mailbox_folder",
+            "m365_tenant_id", "m365_client_id", "m365_client_secret",
+            "m365_mailbox_user", "m365_mailbox_folder",
         ])))
         settings_map = {}
         for s in result.scalars().all():
@@ -28,8 +30,9 @@ async def poll_m365_mailbox(ctx: dict):
             else:
                 settings_map[s.key] = s.value_plain
 
-        if not all(k in settings_map for k in ["m365_tenant_id", "m365_client_id", "m365_client_secret"]):
-            logger.debug("M365 not configured, skipping poll")
+        required = ["m365_tenant_id", "m365_client_id", "m365_client_secret", "m365_mailbox_user"]
+        if not all(settings_map.get(k) for k in required):
+            logger.debug("M365 not fully configured, skipping poll")
             return
 
         try:
@@ -45,9 +48,10 @@ async def poll_m365_mailbox(ctx: dict):
             try:
                 graph_client = GraphServiceClient(credential)
 
+                mailbox_user = settings_map["m365_mailbox_user"]
                 folder = settings_map.get("m365_mailbox_folder", "Inbox")
 
-                # Fetch recent messages (read-only — no write permissions needed)
+                # Use /users/{user} instead of /me for app-only auth
                 query_config = MessagesRequestBuilder.MessagesRequestBuilderGetRequestConfiguration(
                     query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
                         top=20,
@@ -55,7 +59,7 @@ async def poll_m365_mailbox(ctx: dict):
                         orderby=["receivedDateTime desc"],
                     )
                 )
-                messages = await graph_client.me.mail_folders.by_mail_folder_id(folder).messages.get(
+                messages = await graph_client.users.by_user_id(mailbox_user).mail_folders.by_mail_folder_id(folder).messages.get(
                     request_configuration=query_config,
                 )
 

@@ -25,6 +25,7 @@ const M365_KEYS = [
   { key: 'm365_tenant_id', label: 'Tenant ID', secret: false },
   { key: 'm365_client_id', label: 'Client ID', secret: false },
   { key: 'm365_client_secret', label: 'Client Secret', secret: true },
+  { key: 'm365_mailbox_user', label: 'Mailbox User (email)', secret: false },
   { key: 'm365_mailbox_folder', label: 'Mailbox Folder', secret: false },
 ] as const
 
@@ -124,11 +125,19 @@ function M365SetupGuide() {
           </div>
 
           <div>
-            <h4 className="text-white font-medium mb-1">Step 5: Configure Mailbox Folder</h4>
+            <h4 className="text-white font-medium mb-1">Step 5: Set Mailbox User</h4>
+            <ul className="list-disc list-inside space-y-1 text-white/60 text-xs leading-relaxed">
+              <li>Enter the <span className="text-primary">Mailbox User (email)</span> — the email address of the mailbox to monitor (e.g., <span className="text-white/80">paul@yourcompany.com</span>)</li>
+              <li>This is required because app-only auth cannot use /me — it needs an explicit target mailbox</li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-white font-medium mb-1">Step 6: Configure Mailbox Folder</h4>
             <ul className="list-disc list-inside space-y-1 text-white/60 text-xs leading-relaxed">
               <li>Set <span className="text-primary">Mailbox Folder</span> to the folder name to monitor (default: <span className="text-white/80">Inbox</span>)</li>
               <li>Tip: Create a dedicated folder (e.g., "Vendor Orders") and set up an Outlook rule to route vendor emails there</li>
-              <li>The poller checks every 5 minutes for unread messages and marks them as read after importing</li>
+              <li>The poller checks every 5 minutes for new messages and skips any already imported</li>
             </ul>
           </div>
 
@@ -155,6 +164,7 @@ function M365Section({ settings }: { settings: Setting[] }) {
     m365_tenant_id: '',
     m365_client_id: '',
     m365_client_secret: '',
+    m365_mailbox_user: '',
     m365_mailbox_folder: '',
   })
 
@@ -169,6 +179,7 @@ function M365Section({ settings }: { settings: Setting[] }) {
       m365_client_id: getVal('m365_client_id'),
       // Leave secret blank so user must re-enter; show placeholder if masked
       m365_client_secret: '',
+      m365_mailbox_user: getVal('m365_mailbox_user'),
       m365_mailbox_folder: getVal('m365_mailbox_folder'),
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
