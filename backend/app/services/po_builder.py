@@ -7,12 +7,15 @@ def build_odoo_po_values(draft: dict, partner_id: int) -> dict:
     so_names = set()
     for item in draft["line_items"]:
         line_vals = {
-            "name": item.get("description", ""),
             "product_qty": item["quantity"],
             "price_unit": item["unit_price"],
         }
         if item.get("product_odoo_id"):
+            # Use the Odoo product — let Odoo set the name from the product record
             line_vals["product_id"] = item["product_odoo_id"]
+        else:
+            # No product match — use the email description as a free-text line
+            line_vals["name"] = item.get("description", "")
         if item.get("sale_order_id"):
             line_vals["sale_order_id"] = item["sale_order_id"]
         if item.get("sales_order_name"):
