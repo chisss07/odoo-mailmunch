@@ -11,7 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 async def poll_m365_mailbox(ctx: dict):
-    """Poll M365 mailbox for new emails via Microsoft Graph API."""
+    """Poll M365 mailbox for new emails via Microsoft Graph API.
+
+    Uses read-only access (Mail.Read). De-duplicates by storing the Graph
+    message ID in email.external_id so already-imported messages are skipped.
+    """
     async with async_session() as db:
         # Get M365 settings
         result = await db.execute(select(AppSettings).where(AppSettings.key.in_([
@@ -42,17 +46,26 @@ async def poll_m365_mailbox(ctx: dict):
 
                 folder = settings_map.get("m365_mailbox_folder", "Inbox")
 
-                # Fetch unread messages
+                # Fetch recent messages (read-only — no write permissions needed)
                 messages = await graph_client.me.mail_folders.by_mail_folder_id(folder).messages.get(
-                    query_params={"$filter": "isRead eq false", "$top": 20, "$select": "sender,subject,body,hasAttachments"},
+                    query_params={"$top": 20, "$select": "id,sender,subject,body,hasAttachments", "$orderby": "receivedDateTime desc"},
                 )
 
                 if not messages or not messages.value:
                     return
 
-                # First pass: ingest emails into DB
-                message_ids = []
+                # Collect Graph message IDs to check which are already imported
+                graph_ids = [msg.id for msg in messages.value if msg.id]
+                existing_result = await db.execute(
+                    select(Email.external_id).where(Email.external_id.in_(graph_ids))
+                )
+                already_imported = set(existing_result.scalars().all())
+
+                imported_count = 0
                 for msg in messages.value:
+                    if not msg.id or msg.id in already_imported:
+                        continue
+
                     sender = msg.sender.email_address.address if msg.sender else ""
                     sender_domain = sender.split("@")[-1] if "@" in sender else ""
 
@@ -64,20 +77,17 @@ async def poll_m365_mailbox(ctx: dict):
                         source=EmailSource.M365,
                         status=EmailStatus.PROCESSING,
                         classification=EmailClassification.UNCLASSIFIED,
+                        external_id=msg.id,
                         user_id=0,  # TODO: resolve user from M365 settings
                     )
                     db.add(email_record)
-                    message_ids.append(msg.id)
+                    imported_count += 1
 
-                await db.commit()
-                logger.info(f"Polled {len(message_ids)} emails from M365")
-
-                # Second pass: mark as read (after commit so no data loss)
-                for msg_id in message_ids:
-                    try:
-                        await graph_client.me.messages.by_message_id(msg_id).patch({"isRead": True})
-                    except Exception:
-                        logger.warning(f"Failed to mark message {msg_id} as read")
+                if imported_count:
+                    await db.commit()
+                    logger.info(f"Imported {imported_count} new emails from M365 (skipped {len(already_imported)} already imported)")
+                else:
+                    logger.debug("No new emails from M365")
 
             finally:
                 await credential.close()

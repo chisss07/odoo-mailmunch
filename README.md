@@ -58,7 +58,7 @@ Open http://localhost:8000 and log in with your Odoo credentials.
 
 Configure via the Settings page after login:
 1. Register an app in Azure AD
-2. Grant `Mail.ReadWrite` permission
+2. Grant `Mail.Read` permission (read-only)
 3. Enter Tenant ID, Client ID, and Client Secret in Settings
 4. Set the mailbox folder to monitor (default: Inbox)
 

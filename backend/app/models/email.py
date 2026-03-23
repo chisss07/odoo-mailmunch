@@ -41,5 +41,6 @@ class Email(Base):
     source: Mapped[EmailSource] = mapped_column(SAEnum(EmailSource))
     status: Mapped[EmailStatus] = mapped_column(SAEnum(EmailStatus), default=EmailStatus.TRIAGE, index=True)
     classification: Mapped[EmailClassification] = mapped_column(SAEnum(EmailClassification), default=EmailClassification.UNCLASSIFIED)
+    external_id: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, unique=True)
     user_id: Mapped[int] = mapped_column(index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

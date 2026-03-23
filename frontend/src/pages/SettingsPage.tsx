@@ -117,7 +117,7 @@ function M365SetupGuide() {
             <ol className="list-decimal list-inside space-y-1 text-white/60 text-xs leading-relaxed">
               <li>Go to <span className="text-white/80">API permissions &gt; Add a permission &gt; Microsoft Graph</span></li>
               <li>Select <span className="text-white/80">Application permissions</span> (not Delegated)</li>
-              <li>Search for and add: <span className="text-white/80">Mail.Read</span> and <span className="text-white/80">Mail.ReadWrite</span></li>
+              <li>Search for and add: <span className="text-white/80">Mail.Read</span> (read-only — the app never modifies your mailbox)</li>
               <li>Click <span className="text-white/80">Grant admin consent for [your org]</span> and confirm</li>
               <li>Verify both permissions show a green checkmark under Status</li>
             </ol>
