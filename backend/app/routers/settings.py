@@ -33,13 +33,14 @@ async def get_settings(
 ):
     result = await db.execute(select(AppSettings))
     settings_list = result.scalars().all()
-    output = {}
-    for s in settings_list:
-        if s.is_secret:
-            output[s.key] = "****" if s.value_encrypted else None
-        else:
-            output[s.key] = s.value_plain
-    return output
+    return [
+        {
+            "key": s.key,
+            "value": "****" if s.is_secret and s.value_encrypted else (s.value_plain or ""),
+            "is_secret": s.is_secret,
+        }
+        for s in settings_list
+    ]
 
 
 @router.put("")

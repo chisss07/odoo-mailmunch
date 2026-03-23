@@ -8,6 +8,7 @@ from app.deps import get_current_user
 from app.models.session import UserSession
 from app.models.email import Email, EmailStatus, EmailClassification
 from app.models.ignore_rule import IgnoreRule, RuleField, MatchType
+from app.workers.trigger import trigger_email_processing
 
 router = APIRouter(prefix="/api/triage", tags=["triage"])
 
@@ -84,4 +85,6 @@ async def triage_action(
         raise HTTPException(status_code=400, detail=f"Unknown action: {action.action}")
 
     await db.commit()
+    if email_record.status == EmailStatus.PROCESSING:
+        await trigger_email_processing()
     return {"status": "ok", "email_id": email_id, "action": action.action}

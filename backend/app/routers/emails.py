@@ -12,6 +12,7 @@ from app.models.session import UserSession
 from app.models.email import Email, EmailSource, EmailStatus, EmailClassification
 from app.services.text_extractor import extract_text_from_eml, extract_text_from_msg, extract_text_from_pdf, extract_text_from_xlsx, html_to_text
 from app.config import settings
+from app.workers.trigger import trigger_email_processing
 
 router = APIRouter(prefix="/api/emails", tags=["emails"])
 
@@ -46,6 +47,7 @@ async def paste_email(
     db.add(email_record)
     await db.commit()
     await db.refresh(email_record)
+    await trigger_email_processing()
     return {"status": "processing", "email_id": email_record.id}
 
 
@@ -124,6 +126,7 @@ async def upload_email(
     db.add(email_record)
     await db.commit()
     await db.refresh(email_record)
+    await trigger_email_processing()
     return {"status": "processing", "email_id": email_record.id}
 
 
@@ -148,6 +151,7 @@ async def inbound_email_webhook(
     )
     db.add(email_record)
     await db.commit()
+    await trigger_email_processing()
     return {"status": "accepted"}
 
 
