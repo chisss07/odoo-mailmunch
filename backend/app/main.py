@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
+import sqlalchemy as sa
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -33,7 +34,11 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables created")
+        # Schema migrations for existing tables (create_all won't add new columns)
+        await conn.execute(sa.text(
+            "ALTER TABLE emails ADD COLUMN IF NOT EXISTS external_id VARCHAR(500) UNIQUE"
+        ))
+    logger.info("Database tables ready")
     yield
 
 

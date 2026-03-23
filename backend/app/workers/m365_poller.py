@@ -35,6 +35,7 @@ async def poll_m365_mailbox(ctx: dict):
         try:
             from azure.identity.aio import ClientSecretCredential
             from msgraph import GraphServiceClient
+            from msgraph.generated.users.item.mail_folders.item.messages.messages_request_builder import MessagesRequestBuilder
 
             credential = ClientSecretCredential(
                 tenant_id=settings_map["m365_tenant_id"],
@@ -47,8 +48,15 @@ async def poll_m365_mailbox(ctx: dict):
                 folder = settings_map.get("m365_mailbox_folder", "Inbox")
 
                 # Fetch recent messages (read-only — no write permissions needed)
+                query_config = MessagesRequestBuilder.MessagesRequestBuilderGetRequestConfiguration(
+                    query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
+                        top=20,
+                        select=["id", "sender", "subject", "body", "hasAttachments"],
+                        orderby=["receivedDateTime desc"],
+                    )
+                )
                 messages = await graph_client.me.mail_folders.by_mail_folder_id(folder).messages.get(
-                    query_params={"$top": 20, "$select": "id,sender,subject,body,hasAttachments", "$orderby": "receivedDateTime desc"},
+                    request_configuration=query_config,
                 )
 
                 if not messages or not messages.value:
