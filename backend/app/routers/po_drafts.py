@@ -131,7 +131,7 @@ async def submit_draft(
     if not draft:
         raise HTTPException(status_code=404, detail="Draft not found")
     line_items = json.loads(draft.line_items) if draft.line_items else []
-    if not draft.vendor_odoo_id or not line_items:
+    if not (draft.vendor_odoo_id or draft.vendor_name) or not line_items:
         raise HTTPException(status_code=400, detail="Draft must have a vendor and at least one line item")
     try:
         po_result = await create_po_in_odoo(odoo, {

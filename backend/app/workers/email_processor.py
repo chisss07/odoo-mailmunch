@@ -7,7 +7,7 @@ from app.database import async_session
 from app.models.email import Email, EmailStatus, EmailClassification
 from app.models.ignore_rule import IgnoreRule
 from app.models.po_draft import PODraft
-from app.models.cache import VendorCache, ProductCache
+from app.models.cache import VendorCache, ProductCache, VendorProductMap
 from app.services.email_classifier import should_ignore, classify_email
 from app.services.email_parser import parse_order_details, parse_html_order_details
 from app.services.vendor_matcher import match_vendor
@@ -43,6 +43,10 @@ async def process_pending_emails(ctx: dict):
         # Load product cache
         product_result = await db.execute(select(ProductCache))
         products = [{"odoo_id": p.odoo_id, "name": p.name, "default_code": p.default_code, "description": p.description or ""} for p in product_result.scalars().all()]
+
+        # Load vendor-product mappings (for SKU matching by vendor part number)
+        vpm_result = await db.execute(select(VendorProductMap))
+        vendor_products = [{"vendor_odoo_id": vp.vendor_odoo_id, "product_odoo_id": vp.product_odoo_id, "vendor_product_code": vp.vendor_product_code} for vp in vpm_result.scalars().all()]
 
         for email_record in emails:
             try:
@@ -100,12 +104,18 @@ async def process_pending_emails(ctx: dict):
                 logger.info(f"  Email {email_record.id}: vendor={'matched: ' + vendor_match['name'] if vendor_match else 'no match'}")
 
                 # Step 5: Match products
+                # Filter vendor-product mappings for the matched vendor
+                vendor_specific_products = None
+                if vendor_match:
+                    vendor_specific_products = [vp for vp in vendor_products if vp["vendor_odoo_id"] == vendor_match["odoo_id"]]
+
                 matched_items = []
                 for item in parsed["line_items"]:
                     product_match = match_product(
                         description=item["description"],
                         sku=item.get("sku"),
                         products=products,
+                        vendor_products=vendor_specific_products,
                     )
                     matched_item = {**item, "sales_order_id": None, "sales_order_name": None}
                     if product_match:

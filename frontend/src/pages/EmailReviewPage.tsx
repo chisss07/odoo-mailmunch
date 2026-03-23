@@ -30,6 +30,7 @@ export default function EmailReviewPage() {
   const [submitting, setSubmitting] = useState(false)
   const [reprocessing, setReprocessing] = useState(false)
   const [alert, setAlert] = useState<AlertState>(null)
+  const [emailCollapsed, setEmailCollapsed] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -154,14 +155,52 @@ export default function EmailReviewPage() {
       )}
 
       {/* Split view */}
-      <div className="grid grid-cols-2 gap-4 flex-1 min-h-0" style={{ height: 'calc(100vh - 180px)' }}>
+      <div
+        className={`grid gap-4 flex-1 min-h-0 transition-all duration-300 ${
+          emailCollapsed ? 'grid-cols-[auto_1fr]' : 'grid-cols-[2fr_3fr]'
+        }`}
+        style={{ height: 'calc(100vh - 180px)' }}
+      >
         {/* Left: Email viewer */}
-        <div className="overflow-hidden flex flex-col">
-          <EmailViewer email={email} />
+        <div className={`overflow-hidden flex flex-col min-w-0 ${emailCollapsed ? 'w-8' : ''}`}>
+          {emailCollapsed ? (
+            <div className="flex flex-col items-center h-full bg-surface-light rounded-lg border border-white/10">
+              <button
+                type="button"
+                onClick={() => setEmailCollapsed(false)}
+                title="Expand email panel"
+                className="flex flex-col items-center gap-2 pt-3 px-2 text-white/40 hover:text-white/80 transition-colors w-full"
+              >
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                <span
+                  className="text-xs font-medium tracking-wider whitespace-nowrap"
+                  style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)' }}
+                >
+                  Email
+                </span>
+              </button>
+            </div>
+          ) : (
+            <div className="relative flex flex-col h-full">
+              <button
+                type="button"
+                onClick={() => setEmailCollapsed(true)}
+                title="Collapse email panel"
+                className="absolute top-2 right-2 z-10 p-1 rounded text-white/30 hover:text-white/70 hover:bg-white/10 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <EmailViewer email={email} />
+            </div>
+          )}
         </div>
 
         {/* Right: PO draft form */}
-        <div className="overflow-hidden flex flex-col">
+        <div className="overflow-hidden flex flex-col min-w-0">
           {draft ? (
             <PODraftForm
               draft={draft}
