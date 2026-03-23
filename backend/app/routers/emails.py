@@ -151,6 +151,32 @@ async def inbound_email_webhook(
     return {"status": "accepted"}
 
 
+@router.get("/{email_id}")
+async def get_email(
+    email_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: UserSession = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Email).where(Email.id == email_id, Email.user_id == user.odoo_uid)
+    )
+    email = result.scalar_one_or_none()
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+    return {
+        "id": email.id,
+        "sender": email.sender,
+        "subject": email.subject,
+        "body_text": email.body_text,
+        "body_html": email.body_html,
+        "attachment_paths": json.loads(email.attachment_paths) if email.attachment_paths else [],
+        "status": email.status.value,
+        "classification": email.classification.value,
+        "source": email.source.value,
+        "created_at": email.created_at.isoformat(),
+    }
+
+
 @router.get("")
 async def list_emails(
     status: str | None = None,
