@@ -1,6 +1,7 @@
 import type { LineItem } from '../types'
 import ConfidenceBadge from './ConfidenceBadge'
 import ProductSearch from './ProductSearch'
+import SOSelector from './SOSelector'
 
 interface LineItemRowProps {
   item: LineItem
@@ -20,10 +21,10 @@ export default function LineItemRow({ item, index, onUpdate }: LineItemRowProps)
   const subtotal = item.quantity * item.unit_price
 
   return (
-    <div className="grid grid-cols-[1fr_200px_80px_90px_90px_80px] gap-3 items-center py-3 border-b border-white/5 last:border-0">
+    <div className="grid grid-cols-[1fr_160px_160px_60px_80px_80px_60px] gap-2 items-center py-3 border-b border-white/5 last:border-0">
       {/* Description */}
-      <div>
-        <p className="text-white text-sm leading-snug">{item.description}</p>
+      <div className="min-w-0">
+        <p className="text-white text-sm leading-snug truncate">{item.description}</p>
         {item.sku && <p className="text-white/40 text-xs mt-0.5">SKU: {item.sku}</p>}
       </div>
 
@@ -42,6 +43,20 @@ export default function LineItemRow({ item, index, onUpdate }: LineItemRowProps)
               product_name: name === 'No match' ? null : name,
             })
           }
+        />
+      </div>
+
+      {/* Sales Order */}
+      <div>
+        <SOSelector
+          value={{ id: item.sales_order_id ?? null, name: item.sales_order_name ?? null }}
+          onSelect={(id, name) =>
+            onUpdate(index, {
+              sales_order_id: id || null,
+              sales_order_name: name || null,
+            })
+          }
+          compact
         />
       </div>
 

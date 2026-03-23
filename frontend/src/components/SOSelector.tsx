@@ -6,9 +6,10 @@ import type { SalesOrder } from '../types'
 interface SOSelectorProps {
   value: { id: number | null; name: string | null }
   onSelect: (id: number, name: string) => void
+  compact?: boolean
 }
 
-export default function SOSelector({ value, onSelect }: SOSelectorProps) {
+export default function SOSelector({ value, onSelect, compact }: SOSelectorProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SalesOrder[]>([])
@@ -77,13 +78,13 @@ export default function SOSelector({ value, onSelect }: SOSelectorProps) {
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-2 text-left w-full bg-surface border border-white/20 rounded px-3 py-1.5 hover:border-white/40 transition-colors"
+        className={`flex items-center gap-1 text-left w-full bg-surface border border-white/20 rounded hover:border-white/40 transition-colors ${compact ? 'px-2 py-1' : 'px-3 py-1.5'}`}
       >
-        <span className="flex-1 text-sm truncate">
+        <span className={`flex-1 truncate ${compact ? 'text-xs' : 'text-sm'}`}>
           {value.name ? (
             <span className="text-white">{value.name}</span>
           ) : (
-            <span className="text-white/30">Link Sales Order...</span>
+            <span className="text-white/30">{compact ? 'SO...' : 'Link Sales Order...'}</span>
           )}
         </span>
         {value.name && (

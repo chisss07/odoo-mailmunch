@@ -101,7 +101,7 @@ async def process_pending_emails(ctx: dict):
                         sku=item.get("sku"),
                         products=products,
                     )
-                    matched_item = {**item}
+                    matched_item = {**item, "sales_order_id": None, "sales_order_name": None}
                     if product_match:
                         matched_item["product_odoo_id"] = product_match["odoo_id"]
                         matched_item["product_name"] = product_match["name"]

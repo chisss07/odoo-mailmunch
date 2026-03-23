@@ -33,6 +33,8 @@ export interface LineItem {
   product_name: string | null
   product_confidence: string
   alternatives: { odoo_id: number; name: string; score: number }[]
+  sales_order_id: number | null
+  sales_order_name: string | null
 }
 
 export interface PODraft {

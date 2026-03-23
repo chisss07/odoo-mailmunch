@@ -4,6 +4,7 @@ from app.services.odoo_client import OdooClient
 def build_odoo_po_values(draft: dict) -> dict:
     """Build Odoo purchase.order create values from a draft."""
     order_lines = []
+    so_names = set()
     for item in draft["line_items"]:
         line_vals = {
             "product_id": item.get("product_odoo_id"),
@@ -11,12 +12,19 @@ def build_odoo_po_values(draft: dict) -> dict:
             "product_qty": item["quantity"],
             "price_unit": item["unit_price"],
         }
+        if item.get("sale_order_id"):
+            line_vals["sale_order_id"] = item["sale_order_id"]
+        if item.get("sales_order_name"):
+            so_names.add(item["sales_order_name"])
         order_lines.append((0, 0, line_vals))
 
-    return {
+    values = {
         "partner_id": draft["vendor_odoo_id"],
         "order_line": order_lines,
     }
+    if so_names:
+        values["origin"] = ", ".join(sorted(so_names))
+    return values
 
 
 async def create_po_in_odoo(client: OdooClient, draft: dict) -> dict:
