@@ -47,14 +47,15 @@ async def process_pending_emails(ctx: dict):
                 email_record.status = EmailStatus.IGNORED
                 continue
 
-            # Step 2: Classify
-            classification = classify_email(
-                subject=email_record.subject,
-                body=email_record.body_text,
-                sender_domain=email_record.sender_domain,
-                known_vendor_domains=vendor_domains,
-            )
-            email_record.classification = EmailClassification(classification)
+            # Step 2: Classify (skip if user already classified via triage action)
+            if email_record.classification == EmailClassification.UNCLASSIFIED:
+                classification = classify_email(
+                    subject=email_record.subject,
+                    body=email_record.body_text,
+                    sender_domain=email_record.sender_domain,
+                    known_vendor_domains=vendor_domains,
+                )
+                email_record.classification = EmailClassification(classification)
 
             if email_record.classification == EmailClassification.UNCLASSIFIED:
                 email_record.status = EmailStatus.TRIAGE
