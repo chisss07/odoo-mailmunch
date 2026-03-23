@@ -88,39 +88,42 @@ def _extract_line_items(text: str) -> list[LineItem]:
         pattern_items = []
         for match in re.finditer(pattern, text):
             groups = match.groups()
-            if len(groups) == 4:
-                # SKU pattern: description, sku, qty, price
-                pattern_items.append(LineItem(
-                    description=groups[0].strip(),
-                    sku=groups[1].strip(),
-                    quantity=float(groups[2].replace(",", "")),
-                    unit_price=float(groups[3].replace(",", "")),
-                    confidence="high",
-                ))
-            elif len(groups) == 3:
-                # Check if first group is numeric (qty x desc @ price)
-                if groups[0].replace(",", "").isdigit():
-                    qty_val = float(groups[0].replace(",", ""))
-                    price_val = float(groups[2].replace(",", ""))
-                    if qty_val > 50000 or price_val > 500000:
-                        continue
-                    pattern_items.append(LineItem(
-                        description=groups[1].strip(),
-                        quantity=qty_val,
-                        unit_price=price_val,
-                        confidence="medium",
-                    ))
-                else:
-                    qty_val = float(groups[1].replace(",", ""))
-                    price_val = float(groups[2].replace(",", ""))
-                    if qty_val > 50000 or price_val > 500000:
-                        continue
+            try:
+                if len(groups) == 4:
+                    # SKU pattern: description, sku, qty, price
                     pattern_items.append(LineItem(
                         description=groups[0].strip(),
-                        quantity=qty_val,
-                        unit_price=price_val,
-                        confidence="medium",
+                        sku=groups[1].strip(),
+                        quantity=float(groups[2].replace(",", "")),
+                        unit_price=float(groups[3].replace(",", "")),
+                        confidence="high",
                     ))
+                elif len(groups) == 3:
+                    # Check if first group is numeric (qty x desc @ price)
+                    if groups[0].replace(",", "").isdigit():
+                        qty_val = float(groups[0].replace(",", ""))
+                        price_val = float(groups[2].replace(",", ""))
+                        if qty_val > 50000 or price_val > 500000:
+                            continue
+                        pattern_items.append(LineItem(
+                            description=groups[1].strip(),
+                            quantity=qty_val,
+                            unit_price=price_val,
+                            confidence="medium",
+                        ))
+                    else:
+                        qty_val = float(groups[1].replace(",", ""))
+                        price_val = float(groups[2].replace(",", ""))
+                        if qty_val > 50000 or price_val > 500000:
+                            continue
+                        pattern_items.append(LineItem(
+                            description=groups[0].strip(),
+                            quantity=qty_val,
+                            unit_price=price_val,
+                            confidence="medium",
+                        ))
+            except (ValueError, IndexError):
+                continue  # Skip malformed matches
         if pattern_items:
             items = pattern_items
             break

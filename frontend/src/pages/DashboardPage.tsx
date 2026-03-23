@@ -64,7 +64,7 @@ export default function DashboardPage() {
           {loading ? (
             <p className="text-white/40 text-sm">Loading...</p>
           ) : (
-            <POTable emails={emails} />
+            <POTable emails={emails} onRefresh={() => setRefreshKey(k => k + 1)} />
           )}
         </div>
       </div>

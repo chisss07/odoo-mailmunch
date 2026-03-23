@@ -177,6 +177,40 @@ async def get_email(
     }
 
 
+@router.post("/{email_id}/cancel")
+async def cancel_email(
+    email_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: UserSession = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Email).where(Email.id == email_id, Email.user_id == user.odoo_uid)
+    )
+    email_record = result.scalar_one_or_none()
+    if not email_record:
+        raise HTTPException(status_code=404, detail="Email not found")
+    email_record.status = EmailStatus.TRIAGE
+    await db.commit()
+    return {"status": "ok", "email_id": email_id}
+
+
+@router.delete("/{email_id}")
+async def delete_email(
+    email_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: UserSession = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Email).where(Email.id == email_id, Email.user_id == user.odoo_uid)
+    )
+    email_record = result.scalar_one_or_none()
+    if not email_record:
+        raise HTTPException(status_code=404, detail="Email not found")
+    await db.delete(email_record)
+    await db.commit()
+    return {"status": "ok", "email_id": email_id}
+
+
 @router.get("")
 async def list_emails(
     status: str | None = None,

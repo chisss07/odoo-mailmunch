@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom'
+import api from '../api/client'
 import type { EmailRecord } from '../types'
 
 interface POTableProps {
   emails: EmailRecord[]
+  onRefresh?: () => void
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -12,7 +14,7 @@ const STATUS_COLORS: Record<string, string> = {
   ignored: 'bg-white/10 text-white/40',
 }
 
-export default function POTable({ emails }: POTableProps) {
+export default function POTable({ emails, onRefresh }: POTableProps) {
   const navigate = useNavigate()
 
   if (emails.length === 0) {
@@ -21,6 +23,19 @@ export default function POTable({ emails }: POTableProps) {
         No emails yet. Upload or paste an email to get started.
       </p>
     )
+  }
+
+  const handleCancel = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation()
+    await api.post(`/emails/${id}/cancel`)
+    onRefresh?.()
+  }
+
+  const handleDelete = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation()
+    if (!confirm('Delete this email?')) return
+    await api.delete(`/emails/${id}`)
+    onRefresh?.()
   }
 
   return (
@@ -32,7 +47,8 @@ export default function POTable({ emails }: POTableProps) {
             <th className="pb-2 pr-4 font-medium">Subject</th>
             <th className="pb-2 pr-4 font-medium">Status</th>
             <th className="pb-2 pr-4 font-medium">Classification</th>
-            <th className="pb-2 font-medium">Date</th>
+            <th className="pb-2 pr-4 font-medium">Date</th>
+            <th className="pb-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -56,8 +72,26 @@ export default function POTable({ emails }: POTableProps) {
               <td className="py-2 pr-4 text-white/60 capitalize">
                 {email.classification.replace('_', ' ')}
               </td>
-              <td className="py-2 text-white/40">
+              <td className="py-2 pr-4 text-white/40">
                 {new Date(email.created_at).toLocaleDateString()}
+              </td>
+              <td className="py-2">
+                <div className="flex gap-1">
+                  {email.status === 'processing' && (
+                    <button
+                      onClick={e => handleCancel(e, email.id)}
+                      className="px-2 py-0.5 text-xs rounded bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    onClick={e => handleDelete(e, email.id)}
+                    className="px-2 py-0.5 text-xs rounded bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
