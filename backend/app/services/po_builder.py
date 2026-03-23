@@ -11,8 +11,10 @@ def build_odoo_po_values(draft: dict, partner_id: int) -> dict:
             "price_unit": item["unit_price"],
         }
         if item.get("product_odoo_id"):
-            # Use the Odoo product — let Odoo set the name from the product record
+            # Use the matched Odoo product and its name
+            # (XML-RPC create doesn't trigger onchange, so we must set name explicitly)
             line_vals["product_id"] = item["product_odoo_id"]
+            line_vals["name"] = item.get("product_name") or item.get("description", "")
         else:
             # No product match — use the email description as a free-text line
             line_vals["name"] = item.get("description", "")
