@@ -57,6 +57,92 @@ function StatusBadge({ ok, okLabel = 'Connected', failLabel = 'Not configured' }
   )
 }
 
+// ─── M365 Setup Guide ────────────────────────────────────────────────────────
+
+function M365SetupGuide() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="mb-4">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+      >
+        <svg
+          className={`w-4 h-4 transition-transform ${open ? 'rotate-90' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+        Setup Instructions
+      </button>
+
+      {open && (
+        <div className="mt-3 bg-surface rounded-lg border border-white/10 p-4 text-sm text-white/70 space-y-4">
+          <div>
+            <h4 className="text-white font-medium mb-1">Step 1: Register an App in Azure</h4>
+            <ol className="list-decimal list-inside space-y-1 text-white/60 text-xs leading-relaxed">
+              <li>Go to <span className="text-primary">portal.azure.com</span> and sign in with your Microsoft 365 admin account</li>
+              <li>Navigate to <span className="text-white/80">Azure Active Directory &gt; App registrations &gt; New registration</span></li>
+              <li>Name it something like <span className="text-white/80">"MailMunch Email Reader"</span></li>
+              <li>Set <span className="text-white/80">Supported account types</span> to "Accounts in this organizational directory only"</li>
+              <li>Leave Redirect URI blank and click <span className="text-white/80">Register</span></li>
+            </ol>
+          </div>
+
+          <div>
+            <h4 className="text-white font-medium mb-1">Step 2: Copy the IDs</h4>
+            <ol className="list-decimal list-inside space-y-1 text-white/60 text-xs leading-relaxed">
+              <li>From the app's <span className="text-white/80">Overview</span> page, copy the <span className="text-white/80">Application (client) ID</span> &rarr; paste into <span className="text-primary">Client ID</span> below</li>
+              <li>Copy the <span className="text-white/80">Directory (tenant) ID</span> &rarr; paste into <span className="text-primary">Tenant ID</span> below</li>
+            </ol>
+          </div>
+
+          <div>
+            <h4 className="text-white font-medium mb-1">Step 3: Create a Client Secret</h4>
+            <ol className="list-decimal list-inside space-y-1 text-white/60 text-xs leading-relaxed">
+              <li>Go to <span className="text-white/80">Certificates & secrets &gt; New client secret</span></li>
+              <li>Add a description (e.g., "MailMunch") and pick an expiry (24 months recommended)</li>
+              <li>Click <span className="text-white/80">Add</span>, then immediately copy the <span className="text-white/80">Value</span> (it won't be shown again)</li>
+              <li>Paste it into <span className="text-primary">Client Secret</span> below</li>
+            </ol>
+          </div>
+
+          <div>
+            <h4 className="text-white font-medium mb-1">Step 4: Set API Permissions</h4>
+            <ol className="list-decimal list-inside space-y-1 text-white/60 text-xs leading-relaxed">
+              <li>Go to <span className="text-white/80">API permissions &gt; Add a permission &gt; Microsoft Graph</span></li>
+              <li>Select <span className="text-white/80">Application permissions</span> (not Delegated)</li>
+              <li>Search for and add: <span className="text-white/80">Mail.Read</span> and <span className="text-white/80">Mail.ReadWrite</span></li>
+              <li>Click <span className="text-white/80">Grant admin consent for [your org]</span> and confirm</li>
+              <li>Verify both permissions show a green checkmark under Status</li>
+            </ol>
+          </div>
+
+          <div>
+            <h4 className="text-white font-medium mb-1">Step 5: Configure Mailbox Folder</h4>
+            <ul className="list-disc list-inside space-y-1 text-white/60 text-xs leading-relaxed">
+              <li>Set <span className="text-primary">Mailbox Folder</span> to the folder name to monitor (default: <span className="text-white/80">Inbox</span>)</li>
+              <li>Tip: Create a dedicated folder (e.g., "Vendor Orders") and set up an Outlook rule to route vendor emails there</li>
+              <li>The poller checks every 5 minutes for unread messages and marks them as read after importing</li>
+            </ul>
+          </div>
+
+          <div className="pt-2 border-t border-white/10">
+            <p className="text-white/40 text-xs">
+              Note: This uses app-only authentication (no user sign-in required). The app reads from the mailbox of the authenticated tenant. For shared/service mailboxes, additional Graph API scoping may be needed.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── M365 Section ─────────────────────────────────────────────────────────────
 
 function M365Section({ settings }: { settings: Setting[] }) {
@@ -113,6 +199,8 @@ function M365Section({ settings }: { settings: Setting[] }) {
       <div className="flex items-center justify-between mb-4">
         <StatusBadge ok={isConfigured} />
       </div>
+
+      <M365SetupGuide />
 
       <div className="space-y-4">
         {M365_KEYS.map(({ key, label, secret }) => (
