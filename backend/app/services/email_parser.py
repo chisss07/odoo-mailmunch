@@ -131,6 +131,10 @@ def _extract_line_items(text: str) -> list[LineItem]:
             items = pattern_items
             break
 
+    # Try single-line tabular format: "1 SKU HS_CODE QTY $PRICE $TAX $TOTAL"
+    if not items:
+        items = _extract_inline_tabular_items(text)
+
     # Try tabular invoice format (PDF-extracted multi-line blocks)
     if not items:
         items = _extract_tabular_items(text)
@@ -152,6 +156,71 @@ def _extract_line_items(text: str) -> list[LineItem]:
                 unit_price=float(match.group(3).replace(",", "")),
                 confidence="low",
             ))
+
+    return items
+
+
+def _extract_inline_tabular_items(text: str) -> list[LineItem]:
+    """Parse Ubiquiti-style single-line tabular format from PDF text.
+
+    Format:
+        Description Line (details)           ← description on its own line
+        1 SKU-CODE 830140 1 $89.00 $5.65 $89.00  ← line_no SKU HS qty $price $tax $total
+        Tariff Surcharge Fee 1 $6.41 $0.41 $6.41  ← optional fee line
+    """
+    lines = text.splitlines()
+
+    # Only apply if we detect the Ubiquiti header
+    header_idx = None
+    for i, line in enumerate(lines):
+        if re.search(r"NO\.\s+PRODUCT\s+DESCRIPTION", line, re.IGNORECASE):
+            header_idx = i
+            break
+
+    if header_idx is None:
+        return []
+
+    # Pattern for item data lines: line_no SKU HS_code qty $price ...
+    # e.g. "1 UACC-Lock-Strike-Secure-15mm 830140 1 $89.00 $5.65 $89.00"
+    item_line_re = re.compile(
+        r"^(\d{1,2})\s+"           # line number
+        r"([A-Za-z][\w\-]+)\s+"    # SKU (starts with letter, has hyphens)
+        r"\d{4,}\s+"               # HS code (skip)
+        r"(\d+)\s+"                # quantity
+        r"\$([\d,.]+)"             # unit price
+    )
+
+    items = []
+    prev_description = None
+
+    for i in range(header_idx + 1, len(lines)):
+        line = lines[i].strip()
+        if not line:
+            continue
+
+        # Stop at summary lines
+        if re.match(r"^(Total\s+Amount|Shipping\s+Amount|Tariff\s+Amount|Subtotal|Total\s+\$)", line, re.IGNORECASE):
+            break
+
+        # Check if this is an item data line
+        m = item_line_re.match(line)
+        if m:
+            sku = m.group(2)
+            qty = float(m.group(3))
+            price = float(m.group(4).replace(",", ""))
+            description = prev_description or sku
+
+            items.append(LineItem(
+                description=description,
+                sku=sku,
+                quantity=qty,
+                unit_price=price,
+                confidence="high",
+            ))
+            prev_description = None
+        elif not re.match(r"^(Tariff\s+Surcharge|Fee\b)", line, re.IGNORECASE):
+            # This is likely a description line for the next item
+            prev_description = line
 
     return items
 
