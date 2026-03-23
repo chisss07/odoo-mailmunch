@@ -136,6 +136,7 @@ async def submit_draft(
     try:
         po_result = await create_po_in_odoo(odoo, {
             "vendor_odoo_id": draft.vendor_odoo_id,
+            "vendor_name": draft.vendor_name,
             "line_items": line_items,
         })
     except Exception as e:

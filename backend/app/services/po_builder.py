@@ -1,17 +1,18 @@
 from app.services.odoo_client import OdooClient
 
 
-def build_odoo_po_values(draft: dict) -> dict:
+def build_odoo_po_values(draft: dict, partner_id: int) -> dict:
     """Build Odoo purchase.order create values from a draft."""
     order_lines = []
     so_names = set()
     for item in draft["line_items"]:
         line_vals = {
-            "product_id": item.get("product_odoo_id"),
             "name": item.get("description", ""),
             "product_qty": item["quantity"],
             "price_unit": item["unit_price"],
         }
+        if item.get("product_odoo_id"):
+            line_vals["product_id"] = item["product_odoo_id"]
         if item.get("sale_order_id"):
             line_vals["sale_order_id"] = item["sale_order_id"]
         if item.get("sales_order_name"):
@@ -19,7 +20,7 @@ def build_odoo_po_values(draft: dict) -> dict:
         order_lines.append((0, 0, line_vals))
 
     values = {
-        "partner_id": draft["vendor_odoo_id"],
+        "partner_id": partner_id,
         "order_line": order_lines,
     }
     if so_names:
@@ -27,8 +28,33 @@ def build_odoo_po_values(draft: dict) -> dict:
     return values
 
 
+async def _resolve_vendor(client: OdooClient, draft: dict) -> int:
+    """Resolve or create the vendor partner_id in Odoo."""
+    if draft.get("vendor_odoo_id"):
+        return draft["vendor_odoo_id"]
+
+    # Try to find by name
+    vendor_name = draft.get("vendor_name", "Unknown Vendor")
+    partners = await client.search_read(
+        "res.partner",
+        [["name", "ilike", vendor_name], ["supplier_rank", ">", 0]],
+        ["id", "name"],
+        limit=1,
+    )
+    if partners:
+        return partners[0]["id"]
+
+    # Create new vendor
+    partner_id = await client.create("res.partner", {
+        "name": vendor_name,
+        "supplier_rank": 1,
+    })
+    return partner_id
+
+
 async def create_po_in_odoo(client: OdooClient, draft: dict) -> dict:
-    values = build_odoo_po_values(draft)
+    partner_id = await _resolve_vendor(client, draft)
+    values = build_odoo_po_values(draft, partner_id)
     po_id = await client.create("purchase.order", values)
     pos = await client.search_read("purchase.order", [["id", "=", po_id]], ["name"])
     po_name = pos[0]["name"] if pos else f"PO-{po_id}"
