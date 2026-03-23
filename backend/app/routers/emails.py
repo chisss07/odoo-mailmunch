@@ -239,3 +239,24 @@ async def list_emails(
         }
         for e in emails
     ]
+
+
+@router.post("/{email_id}/reprocess")
+async def reprocess_email(
+    email_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: UserSession = Depends(get_current_user),
+):
+    """Reset an email to PROCESSING status so the worker re-processes it."""
+    result = await db.execute(
+        select(Email).where(Email.id == email_id, Email.user_id == user.odoo_uid)
+    )
+    email_record = result.scalar_one_or_none()
+    if not email_record:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    email_record.status = EmailStatus.PROCESSING
+    email_record.classification = EmailClassification.UNCLASSIFIED
+    await db.commit()
+    await trigger_email_processing()
+    return {"status": "ok", "email_id": email_id}

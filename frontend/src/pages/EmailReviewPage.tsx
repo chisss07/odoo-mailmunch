@@ -28,6 +28,7 @@ export default function EmailReviewPage() {
   const [loadError, setLoadError] = useState('')
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [reprocessing, setReprocessing] = useState(false)
   const [alert, setAlert] = useState<AlertState>(null)
 
   useEffect(() => {
@@ -174,6 +175,28 @@ export default function EmailReviewPage() {
                 <p className="text-white/25 text-xs mt-1">
                   The email may still be processing or was not recognized as a PO
                 </p>
+                <button
+                  onClick={async () => {
+                    setReprocessing(true)
+                    try {
+                      await api.post(`/emails/${id}/reprocess`)
+                      showAlert('success', 'Email queued for reprocessing')
+                      // Reload after a short delay to pick up the new draft
+                      setTimeout(() => window.location.reload(), 3000)
+                    } catch (err) {
+                      const message = axios.isAxiosError(err)
+                        ? err.response?.data?.detail ?? err.message
+                        : 'Reprocess failed'
+                      showAlert('error', message)
+                    } finally {
+                      setReprocessing(false)
+                    }
+                  }}
+                  disabled={reprocessing}
+                  className="mt-4 bg-primary hover:bg-primary/80 text-white text-sm px-4 py-2 rounded disabled:opacity-40"
+                >
+                  {reprocessing ? 'Reprocessing...' : 'Reprocess Email'}
+                </button>
               </div>
             </div>
           )}

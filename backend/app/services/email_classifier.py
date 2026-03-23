@@ -67,18 +67,18 @@ def classify_email(
 
     is_known_vendor = sender_domain.lower() in [d.lower() for d in known_vendor_domains]
 
-    # Check shipping first (more specific)
-    shipping_score = _keyword_score(combined, SHIPPING_KEYWORDS)
-    if shipping_score >= 1:
-        return "shipping_notice"
+    # Score all categories — subject keywords count double (more intentional signal)
+    po_score = _keyword_score(subject, PO_KEYWORDS) * 2 + _keyword_score(body[:MAX_CLASSIFY_CHARS], PO_KEYWORDS)
+    shipping_score = _keyword_score(subject, SHIPPING_KEYWORDS) * 2 + _keyword_score(body[:MAX_CLASSIFY_CHARS], SHIPPING_KEYWORDS)
+    bill_score = _keyword_score(subject, BILL_KEYWORDS) * 2 + _keyword_score(body[:MAX_CLASSIFY_CHARS], BILL_KEYWORDS)
 
-    # Check PO
-    po_score = _keyword_score(combined, PO_KEYWORDS)
-    if po_score >= 1:
+    # Pick the highest-scoring category (PO wins ties since it's our primary use case)
+    if po_score >= 1 and po_score >= shipping_score:
         return "purchase_order"
 
-    # Check bill
-    bill_score = _keyword_score(combined, BILL_KEYWORDS)
+    if shipping_score >= 1 and shipping_score > po_score:
+        return "shipping_notice"
+
     if bill_score >= 1:
         return "bill"
 
