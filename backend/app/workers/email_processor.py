@@ -9,7 +9,7 @@ from app.models.ignore_rule import IgnoreRule
 from app.models.po_draft import PODraft
 from app.models.cache import VendorCache, ProductCache
 from app.services.email_classifier import should_ignore, classify_email
-from app.services.email_parser import parse_order_details
+from app.services.email_parser import parse_order_details, parse_html_order_details
 from app.services.vendor_matcher import match_vendor
 from app.services.product_matcher import match_product
 from app.services.tracking_parser import parse_tracking_info
@@ -81,9 +81,15 @@ async def process_pending_emails(ctx: dict):
                     logger.info(f"  Email {email_record.id}: bill sent to triage")
                     continue
 
-                # Step 3: Parse order details
-                parsed = parse_order_details(email_record.body_text)
-                logger.info(f"  Email {email_record.id}: parsed {len(parsed['line_items'])} line items, total={parsed['total_amount']}")
+                # Step 3: Parse order details (try HTML first, then plain text)
+                parsed = None
+                if email_record.body_html:
+                    parsed = parse_html_order_details(email_record.body_html)
+                    logger.info(f"  Email {email_record.id}: HTML parse → {len(parsed['line_items'])} line items")
+                if not parsed or not parsed["line_items"]:
+                    parsed = parse_order_details(email_record.body_text)
+                    logger.info(f"  Email {email_record.id}: text parse → {len(parsed['line_items'])} line items")
+                logger.info(f"  Email {email_record.id}: total={parsed['total_amount']}")
 
                 # Step 4: Match vendor
                 vendor_match = match_vendor(

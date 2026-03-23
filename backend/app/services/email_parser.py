@@ -24,6 +24,8 @@ class ParsedOrder:
 # Patterns for order numbers
 ORDER_PATTERNS = [
     r"(?:Invoice\s*No\.?|order|PO|purchase\s*order|confirmation)\s*#?\s*:?\s*([A-Za-z0-9\-]+\d+)",
+    r"(?:Order\s+Number|PO\s+Number)\s*:?\s*([A-Za-z0-9\-]+\d+)",
+    r"Order\s*#\s*\n\s*(\d[\d\-]+\d)",  # Amazon: "Order #\n113-1207070-0461035"
     r"#\s*([A-Za-z]*\-?\d{4,})",
     r"(?:order|PO)\s+number\s*:?\s*(\d+)",
 ]
@@ -34,8 +36,8 @@ LINE_ITEM_PATTERNS = [
     r"(.+?)\s*\((?:SKU|sku|Sku)\s*:\s*([A-Za-z0-9\-]+)\)\s*[-–]\s*(?:Qty|qty|Quantity)\s*:\s*(\d+)\s*[-–]\s*\$?([\d,.]+)",
     # "50 x Widget A @ $5.00"
     r"(\d+)\s*[xX×]\s*(.+?)\s*[@aAtT]\s*\$?([\d,.]+)",
-    # "Widget A - 50 - $5.00"
-    r"(.+?)\s*[-–]\s*(\d+)\s*[-–]\s*\$?([\d,.]+)",
+    # "Widget A - 50 - $5.00" (description must start with a letter, not a digit)
+    r"([A-Za-z].+?)\s*[-–]\s*(\d+)\s*[-–]\s*\$?([\d,.]+)",
 ]
 
 # Pattern for informal "N items at $X each"
@@ -51,6 +53,7 @@ DATE_PATTERNS = [
 # Total patterns
 TOTAL_PATTERNS = [
     r"^Total\s+\$?([\d,.]+)\s*$",  # "Total $322.60" on its own line
+    r"Grand\s+Total\s*:?\s*\n?\s*([\d,.]+)\s*USD",  # Amazon: "Grand Total:\n733.7 USD"
     r"(?:total|amount)\s*:?\s*\$?([\d,.]+)",
     r"\$\s*([\d,.]+)\s*(?:total|due)",
 ]
@@ -131,6 +134,14 @@ def _extract_line_items(text: str) -> list[LineItem]:
     # Try tabular invoice format (PDF-extracted multi-line blocks)
     if not items:
         items = _extract_tabular_items(text)
+
+    # Try SKU/unit/each block pattern (from HTML-to-text conversion)
+    if not items:
+        items = _extract_sku_block_items(text)
+
+    # Try Amazon-style "* item\n  Quantity: N\n  XX.XX USD" pattern
+    if not items:
+        items = _extract_amazon_items(text)
 
     # Try informal pattern if nothing found
     if not items:
@@ -285,6 +296,233 @@ def _extract_total(text: str) -> float | None:
         if match:
             return float(match.group(1).replace(",", ""))
     return None
+
+
+def parse_html_order_details(html: str) -> dict:
+    """Parse order details directly from HTML email content.
+
+    Extracts structured data from HTML patterns like:
+      - SKU in URL params (?sku=XXX) or text "SKU: XXX"
+      - Quantity from "N unit(s)" text
+      - Price from "$XXX.XX each" text
+      - Product name from link text or alt attributes
+    """
+    if not html:
+        return {"order_number": None, "vendor_name": None, "line_items": [], "total_amount": None, "expected_date": None}
+
+    from app.services.text_extractor import html_to_text
+    plain = html_to_text(html)
+
+    # Get order number and total from plain text
+    order_number = _extract_first_match(plain, ORDER_PATTERNS)
+    total_amount = _extract_total(plain)
+    expected_date = _extract_first_match(plain, DATE_PATTERNS)
+
+    # Extract items from HTML structure
+    items = _extract_html_line_items(html)
+
+    return {
+        "order_number": order_number,
+        "vendor_name": None,
+        "line_items": [_line_item_to_dict(li) for li in items],
+        "total_amount": total_amount,
+        "expected_date": expected_date,
+    }
+
+
+def _extract_html_line_items(html: str) -> list[LineItem]:
+    """Extract line items from HTML email by finding SKU/qty/price patterns."""
+    items = []
+
+    # Find all SKU mentions with surrounding context
+    # Pattern: find blocks that contain "SKU: XXX" text
+    sku_pattern = re.compile(
+        r"SKU:\s*([A-Za-z0-9][\w\-]*)",
+        re.IGNORECASE,
+    )
+
+    # Find "$X.XX each" prices
+    each_price_pattern = re.compile(r"\$([\d,.]+)\s*each", re.IGNORECASE)
+
+    # Find "N unit(s)" quantities
+    unit_qty_pattern = re.compile(r"(\d+)\s*units?", re.IGNORECASE)
+
+    # Find product names in link text (anchor tags with product descriptions)
+    # These are typically in <a> tags with product URLs
+    product_link_pattern = re.compile(
+        r'<a[^>]*href=["\'][^"\']*product[^"\']*\?sku[^"\']*["\'][^>]*>'
+        r'\s*(.*?)\s*</a>',
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    # Strategy: split HTML into item blocks and extract from each
+    # Look for repeating table structures separated by borders
+    # Each item block typically contains: product link, SKU div, qty div, price cells
+
+    # Find all product links with SKU in URL
+    product_links = list(product_link_pattern.finditer(html))
+
+    if not product_links:
+        # Try alt attributes from img tags as fallback
+        alt_pattern = re.compile(
+            r'<a[^>]*href=["\'][^"\']*product[^"\']*["\'][^>]*>.*?'
+            r'<img[^>]*alt=["\']([^"\']+)["\']',
+            re.IGNORECASE | re.DOTALL,
+        )
+        product_links = list(alt_pattern.finditer(html))
+
+    if not product_links:
+        return []
+
+    # For each product link, find the surrounding block and extract SKU, qty, price
+    seen_descriptions = set()
+    for link_match in product_links:
+        # Get product description from link text, strip HTML tags
+        desc_raw = link_match.group(1)
+        description = re.sub(r"<[^>]+>", "", desc_raw).strip()
+        description = re.sub(r"\s+", " ", description)
+
+        if not description or len(description) < 3:
+            continue
+
+        # Skip duplicate descriptions (same product link appears twice: image + text)
+        if description in seen_descriptions:
+            continue
+        seen_descriptions.add(description)
+
+        # Search in a window after this match for SKU, qty, price
+        window_start = link_match.start()
+        window_end = min(len(html), link_match.end() + 2000)
+        window = html[window_start:window_end]
+
+        # Extract SKU
+        sku_match = sku_pattern.search(window)
+        sku = sku_match.group(1) if sku_match else None
+
+        # Also try SKU from URL param
+        if not sku:
+            url_sku = re.search(r'[?&]sku=([A-Za-z0-9][\w\-]*)', window, re.IGNORECASE)
+            if url_sku:
+                sku = url_sku.group(1)
+
+        # Extract quantity
+        qty_match = unit_qty_pattern.search(window)
+        quantity = float(qty_match.group(1)) if qty_match else 1.0
+
+        # Extract price ("$X.XX each")
+        price_match = each_price_pattern.search(window)
+        unit_price = float(price_match.group(1).replace(",", "")) if price_match else 0.0
+
+        items.append(LineItem(
+            description=description,
+            sku=sku,
+            quantity=quantity,
+            unit_price=unit_price,
+            confidence="high" if sku and unit_price > 0 else "medium",
+        ))
+
+    return items
+
+
+def _extract_sku_block_items(text: str) -> list[LineItem]:
+    """Parse items from text with SKU/unit/each patterns (from HTML-to-text conversion).
+
+    Handles patterns like:
+        Product Name
+        SKU: U7-Pro-Max
+        Brand: Ubiquiti
+        1 unit
+        $263.75 each
+        $263.75
+    """
+    items = []
+    lines = text.splitlines()
+
+    for i, line in enumerate(lines):
+        sku_match = re.match(r"^\s*SKU:\s*([A-Za-z0-9][\w\-]*)", line, re.IGNORECASE)
+        if not sku_match:
+            continue
+
+        sku = sku_match.group(1)
+
+        # Look backwards for description (first non-empty, non-SKU, non-Brand line)
+        description = sku
+        for j in range(i - 1, max(i - 5, -1), -1):
+            prev = lines[j].strip()
+            if not prev:
+                continue
+            if re.match(r"^(SKU|Brand|Sign In)\s*:", prev, re.IGNORECASE):
+                continue
+            if len(prev) > 5:
+                description = prev
+                break
+
+        # Look forward for quantity and price
+        quantity = 1.0
+        unit_price = 0.0
+        for j in range(i + 1, min(i + 8, len(lines))):
+            fwd = lines[j].strip()
+            qty_match = re.match(r"^(\d+)\s+units?$", fwd, re.IGNORECASE)
+            price_match = re.match(r"^\$([\d,.]+)\s+each$", fwd, re.IGNORECASE)
+            if qty_match:
+                quantity = float(qty_match.group(1))
+            if price_match:
+                unit_price = float(price_match.group(1).replace(",", ""))
+
+        items.append(LineItem(
+            description=description,
+            sku=sku,
+            quantity=quantity,
+            unit_price=unit_price,
+            confidence="high" if unit_price > 0 else "medium",
+        ))
+
+    return items
+
+
+def _extract_amazon_items(text: str) -> list[LineItem]:
+    """Parse Amazon-style order confirmations.
+
+    Format:
+        * Product Description Here
+          Quantity: 2
+          99.99 USD
+    """
+    items = []
+    lines = text.splitlines()
+
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+
+        # Look for lines starting with "* " (bullet item)
+        if line.startswith("* "):
+            description = line[2:].strip()
+            quantity = 1.0
+            unit_price = 0.0
+
+            # Look ahead for Quantity and price (stop at blank lines or next bullet)
+            for j in range(i + 1, min(i + 6, len(lines))):
+                fwd = lines[j].strip()
+                if not fwd or fwd.startswith("* "):
+                    break
+                qty_match = re.match(r"Quantity:\s*(\d+)", fwd, re.IGNORECASE)
+                price_match = re.match(r"([\d,.]+)\s*USD", fwd, re.IGNORECASE)
+                if qty_match:
+                    quantity = float(qty_match.group(1))
+                if price_match:
+                    unit_price = float(price_match.group(1).replace(",", ""))
+
+            if unit_price > 0:
+                items.append(LineItem(
+                    description=description,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    confidence="high",
+                ))
+        i += 1
+
+    return items
 
 
 def _line_item_to_dict(item: LineItem) -> dict:
