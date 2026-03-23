@@ -26,14 +26,15 @@ class DraftUpdate(BaseModel):
 
 @router.get("")
 async def list_drafts(
+    email_id: int | None = None,
     db: AsyncSession = Depends(get_db),
     user: UserSession = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(PODraft)
-        .where(PODraft.user_id == user.odoo_uid, PODraft.status == DraftStatus.DRAFT)
-        .order_by(PODraft.created_at.desc())
-    )
+    query = select(PODraft).where(PODraft.user_id == user.odoo_uid, PODraft.status == DraftStatus.DRAFT)
+    if email_id is not None:
+        query = query.where(PODraft.email_id == email_id)
+    query = query.order_by(PODraft.created_at.desc())
+    result = await db.execute(query)
     drafts = result.scalars().all()
     return [
         {
@@ -100,7 +101,20 @@ async def update_draft(
     if update.sales_order_name is not None:
         draft.sales_order_name = update.sales_order_name
     await db.commit()
-    return {"status": "updated"}
+    await db.refresh(draft)
+    return {
+        "id": draft.id,
+        "email_id": draft.email_id,
+        "vendor_odoo_id": draft.vendor_odoo_id,
+        "vendor_name": draft.vendor_name,
+        "vendor_confidence": draft.vendor_confidence,
+        "line_items": json.loads(draft.line_items) if draft.line_items else [],
+        "total_amount": draft.total_amount,
+        "expected_date": draft.expected_date,
+        "sales_order_id": draft.sales_order_id,
+        "sales_order_name": draft.sales_order_name,
+        "status": draft.status.value,
+    }
 
 
 @router.post("/{draft_id}/submit")

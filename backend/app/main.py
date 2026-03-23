@@ -1,8 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
@@ -60,11 +61,18 @@ def create_app() -> FastAPI:
     app.include_router(settings_router.router)
 
     # NOTE: All API routers must be included ABOVE this line.
-    # The SPA static file mount catches ALL unmatched routes.
-    # Any router registered after this mount will be unreachable.
+    # Serve SPA static assets, with fallback to index.html for client-side routes.
     spa_path = Path("/app/frontend/dist")
     if spa_path.exists():
-        app.mount("/", StaticFiles(directory=str(spa_path), html=True), name="spa")
+        app.mount("/assets", StaticFiles(directory=str(spa_path / "assets")), name="spa-assets")
+
+        @app.get("/{full_path:path}")
+        async def spa_fallback(request: Request, full_path: str):
+            # Serve the actual file if it exists, otherwise index.html
+            file_path = spa_path / full_path
+            if file_path.is_file():
+                return FileResponse(file_path)
+            return FileResponse(spa_path / "index.html")
 
     return app
 
