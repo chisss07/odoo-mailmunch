@@ -107,7 +107,7 @@ function M365SetupGuide() {
             <ol className="list-decimal list-inside space-y-1 text-white/60 text-xs leading-relaxed">
               <li>Go to <span className="text-white/80">Certificates & secrets &gt; New client secret</span></li>
               <li>Add a description (e.g., "MailMunch") and pick an expiry (24 months recommended)</li>
-              <li>Click <span className="text-white/80">Add</span>, then immediately copy the <span className="text-white/80">Value</span> (it won't be shown again)</li>
+              <li>Click <span className="text-white/80">Add</span>, then immediately copy the <span className="text-white/80">Value</span> column (not the Secret ID — the Value is only shown once)</li>
               <li>Paste it into <span className="text-primary">Client Secret</span> below</li>
             </ol>
           </div>
